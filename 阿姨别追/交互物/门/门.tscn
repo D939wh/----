@@ -1,6 +1,6 @@
 [gd_scene load_steps=4 format=3]
 
-[ext_resource type="Script" path="res://交互物/门/门.gd" id="1_door"]
+[ext_resource type="Script" uid="uid://ckok3fbdble77" path="res://交互物/门/门.gd" id="1_door"]
 
 [sub_resource type="RectangleShape2D" id="Rect_blocker"]
 size = Vector2(64, 96)
