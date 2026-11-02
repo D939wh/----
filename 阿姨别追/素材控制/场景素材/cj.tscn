@@ -3,6 +3,9 @@
 [ext_resource type="TileSet" uid="uid://dnc13muij7c4l" path="res://素材控制/场景素材/t.tres" id="1_cw3q1"]
 [ext_resource type="PackedScene" uid="uid://bu704p01xw1bj" path="res://游戏效果控制/场景交互/梯子.tscn" id="2_8a7vl"]
 [ext_resource type="PackedScene" uid="uid://dabl1bbaqf7bx" path="res://游戏角色/student.tscn" id="2_357ng"]
+[ext_resource type="PackedScene" uid="uid://dp6g075u2il3h" path="res://游戏效果控制/场景交互/可使用物品.tscn" id="4_1xcxt"]
+[ext_resource type="PackedScene" uid="uid://doyrhatbglu8e" path="res://游戏效果控制/场景交互/可搬运箱子.tscn" id="5_nuk2p"]
+[ext_resource type="PackedScene" path="res://游戏效果控制/界面/HUD.tscn" id="6_hud"]
 
 [node name="Node2D" type="Node2D" unique_id=1549066768]
 
@@ -14,3 +17,12 @@ tile_set = ExtResource("1_cw3q1")
 position = Vector2(439, 75)
 
 [node name="student" parent="." unique_id=1062713042 instance=ExtResource("2_357ng")]
+position = Vector2(879, 178)
+
+[node name="UsableItem" parent="." unique_id=1396500502 instance=ExtResource("4_1xcxt")]
+position = Vector2(1230, 182)
+
+[node name="CarryableBox" parent="." unique_id=265815722 instance=ExtResource("5_nuk2p")]
+position = Vector2(1010, 186)
+
+[node name="HUD" parent="." instance=ExtResource("6_hud")]

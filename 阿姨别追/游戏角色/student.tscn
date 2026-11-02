@@ -20,6 +20,9 @@ size = Vector2(20, 44)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_climb"]
 size = Vector2(16, 56)
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_77438"]
+size = Vector2(96, 96)
+
 [node name="student" type="CharacterBody2D" unique_id=1178503731]
 script = ExtResource("1_77438")
 
@@ -43,10 +46,18 @@ drag_bottom_margin = 0.06
 position = Vector2(0, -22)
 shape = SubResource("RectangleShape2D_1")
 
-[node name="ClimbZone" type="Area2D" parent="."]
+[node name="ClimbZone" type="Area2D" parent="." unique_id=1740422596]
 position = Vector2(0, -24)
 collision_layer = 0
 collision_mask = 4
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="ClimbZone"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ClimbZone" unique_id=1882481678]
 shape = SubResource("RectangleShape2D_climb")
+
+[node name="PickupZone" type="Area2D" parent="." unique_id=1619083970]
+position = Vector2(0, -22)
+collision_layer = 0
+collision_mask = 8
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="PickupZone" unique_id=439939627]
+shape = SubResource("RectangleShape2D_77438")
