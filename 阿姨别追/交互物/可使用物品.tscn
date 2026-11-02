@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://dp6g075u2il3h"]
 
-[ext_resource type="Texture2D" uid="uid://jeg5w34hsggt" path="res://素材控制/道具/钥匙_占位.png" id="1_28th4"]
+[ext_resource type="Texture2D" uid="uid://jeg5w34hsggt" path="res://素材/道具/钥匙_占位.png" id="1_28th4"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_mrg2g"]
 size = Vector2(26, 16)

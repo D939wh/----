@@ -1,11 +1,11 @@
 [gd_scene format=4 uid="uid://b35p4a3rfl3yk"]
 
-[ext_resource type="TileSet" uid="uid://dnc13muij7c4l" path="res://素材控制/场景素材/t.tres" id="1_cw3q1"]
-[ext_resource type="PackedScene" uid="uid://bu704p01xw1bj" path="res://游戏效果控制/场景交互/梯子.tscn" id="2_8a7vl"]
-[ext_resource type="PackedScene" uid="uid://dabl1bbaqf7bx" path="res://游戏角色/student.tscn" id="2_357ng"]
-[ext_resource type="PackedScene" uid="uid://dp6g075u2il3h" path="res://游戏效果控制/场景交互/可使用物品.tscn" id="4_1xcxt"]
-[ext_resource type="PackedScene" uid="uid://doyrhatbglu8e" path="res://游戏效果控制/场景交互/可搬运箱子.tscn" id="5_nuk2p"]
-[ext_resource type="PackedScene" path="res://游戏效果控制/界面/HUD.tscn" id="6_hud"]
+[ext_resource type="TileSet" uid="uid://dnc13muij7c4l" path="res://素材/场景/t.tres" id="1_cw3q1"]
+[ext_resource type="PackedScene" uid="uid://bu704p01xw1bj" path="res://交互物/梯子.tscn" id="2_8a7vl"]
+[ext_resource type="PackedScene" uid="uid://dabl1bbaqf7bx" path="res://角色/学生/student.tscn" id="2_357ng"]
+[ext_resource type="PackedScene" uid="uid://dp6g075u2il3h" path="res://交互物/可使用物品.tscn" id="4_1xcxt"]
+[ext_resource type="PackedScene" uid="uid://doyrhatbglu8e" path="res://交互物/可搬运箱子.tscn" id="5_nuk2p"]
+[ext_resource type="PackedScene" path="res://界面/HUD.tscn" id="6_hud"]
 
 [node name="Node2D" type="Node2D" unique_id=1549066768]
 

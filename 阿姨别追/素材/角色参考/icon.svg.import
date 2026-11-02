@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://jeg5w34hsggt"
-path="res://.godot/imported/钥匙_占位.png-868bbef901ea362c4ac7d7280e3f806d.ctex"
+uid="uid://bwwrtdf50eed0"
+path="res://.godot/imported/icon.svg-608975a0f3a0b61243e7a539033236e8.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://素材控制/道具/钥匙_占位.png"
-dest_files=["res://.godot/imported/钥匙_占位.png-868bbef901ea362c4ac7d7280e3f806d.ctex"]
+source_file="res://素材/角色参考/icon.svg"
+dest_files=["res://.godot/imported/icon.svg-608975a0f3a0b61243e7a539033236e8.ctex"]
 
 [params]
 
@@ -38,3 +38,6 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
+svg/scale=1.0
+editor/scale_with_editor_scale=false
+editor/convert_colors_with_editor_theme=false

@@ -31,8 +31,8 @@ def strip(path):
             out.append(code)
     return out
 
-a = strip(r"D:\dugaogaogao\阿姨别追\阿姨别追\游戏效果控制\角色交互\基础移动\student.gd")
-b = strip(r"D:\dugaogaogao\阿姨别追\阿姨别追\游戏效果控制\角色交互\基础移动\参考答案_student.gd")
+a = strip(r"D:\dugaogaogao\阿姨别追\阿姨别追\角色\学生\student.gd")
+b = strip(r"D:\dugaogaogao\阿姨别追\阿姨别追\参考资料\参考答案_student.gd")
 
 print("正式版代码行数: %d" % len(a))
 print("参考答案代码行数: %d" % len(b))

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ckcowmv01n0kv"
-path="res://.godot/imported/占位预览_4倍.png-9e04e4d0deb1b5327332cbe02b788385.ctex"
+uid="uid://b1olrekytsack"
+path="res://.godot/imported/蓝碗_占位.png-30be081683c9112edd5e77c8ae65cf43.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://素材控制/道具/占位预览_4倍.png"
-dest_files=["res://.godot/imported/占位预览_4倍.png-9e04e4d0deb1b5327332cbe02b788385.ctex"]
+source_file="res://素材/道具/蓝碗_占位.png"
+dest_files=["res://.godot/imported/蓝碗_占位.png-30be081683c9112edd5e77c8ae65cf43.ctex"]
 
 [params]
 

@@ -1,6 +1,6 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://游戏效果控制/界面/HUD.gd" id="1_hud"]
+[ext_resource type="Script" path="res://界面/HUD.gd" id="1_hud"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_13ssr"]
 bg_color = Color(0.1, 0.13, 0.16, 0.9)

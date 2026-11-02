@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://dabl1bbaqf7bx"]
 
-[ext_resource type="Script" uid="uid://jsrsy436jrhg" path="res://游戏效果控制/角色交互/基础移动/student.gd" id="1_77438"]
-[ext_resource type="Texture2D" uid="uid://dffmvgacehnyx" path="res://icon.svg" id="1_p1ren"]
+[ext_resource type="Script" uid="uid://jsrsy436jrhg" path="res://角色/学生/student.gd" id="1_77438"]
+[ext_resource type="Texture2D" uid="uid://bwwrtdf50eed0" path="res://素材/角色参考/icon.svg" id="1_p1ren"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_3f5lc"]
 animations = [{

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cs2q3bn3tq4fe"
-path="res://.godot/imported/道具.png-b00ce17b520cf8881f80db1a2d1581ba.ctex"
+uid="uid://dgix4ljkb2ye8"
+path="res://.godot/imported/钥匙_占位_原切.png-879539638f2eabfdfa44ead76bb6845d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://素材控制/道具/道具.png"
-dest_files=["res://.godot/imported/道具.png-b00ce17b520cf8881f80db1a2d1581ba.ctex"]
+source_file="res://素材/道具/钥匙_占位_原切.png"
+dest_files=["res://.godot/imported/钥匙_占位_原切.png-879539638f2eabfdfa44ead76bb6845d.ctex"]
 
 [params]
 

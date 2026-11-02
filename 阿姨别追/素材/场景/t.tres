@@ -1,6 +1,6 @@
 [gd_resource type="TileSet" format=3 uid="uid://dnc13muij7c4l"]
 
-[ext_resource type="Texture2D" uid="uid://bqx2cd4d0p2l6" path="res://游戏场景/图块_场景精灵表_16像素_2026-10-29.png" id="1_nqcqu"]
+[ext_resource type="Texture2D" uid="uid://bqx2cd4d0p2l6" path="res://素材/场景/图块_场景精灵表_16像素_2026-10-29.png" id="1_nqcqu"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_4jurv"]
 texture = ExtResource("1_nqcqu")

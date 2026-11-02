@@ -13,7 +13,7 @@ config_version=5
 config/name="阿姨别追"
 run/main_scene="uid://b35p4a3rfl3yk"
 config/features=PackedStringArray("4.7", "Forward Plus")
-config/icon="res://icon.svg"
+config/icon="res://素材/角色参考/icon.svg"
 
 [autoload]
 

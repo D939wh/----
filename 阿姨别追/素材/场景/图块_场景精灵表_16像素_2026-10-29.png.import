@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c3cd73nc6c0b8"
-path="res://.godot/imported/纸箱_占位.png-2cc46f7e802cf2f1fc1c270be595ab9e.ctex"
+uid="uid://bqx2cd4d0p2l6"
+path="res://.godot/imported/图块_场景精灵表_16像素_2026-10-29.png-d1f5cfc5c9ced241a0997733549d454f.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://素材控制/道具/纸箱_占位.png"
-dest_files=["res://.godot/imported/纸箱_占位.png-2cc46f7e802cf2f1fc1c270be595ab9e.ctex"]
+source_file="res://素材/场景/图块_场景精灵表_16像素_2026-10-29.png"
+dest_files=["res://.godot/imported/图块_场景精灵表_16像素_2026-10-29.png-d1f5cfc5c9ced241a0997733549d454f.ctex"]
 
 [params]
 

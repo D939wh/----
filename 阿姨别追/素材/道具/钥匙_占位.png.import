@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dvy6hofdvg3wj"
-path="res://.godot/imported/梯子.png-ec76afeb83a9cd7ce8d2dceedbd2bfd6.ctex"
+uid="uid://jeg5w34hsggt"
+path="res://.godot/imported/钥匙_占位.png-0ad5886ae5ed5ce2345f3f8dc70537e2.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://素材控制/梯子/梯子.png"
-dest_files=["res://.godot/imported/梯子.png-ec76afeb83a9cd7ce8d2dceedbd2bfd6.ctex"]
+source_file="res://素材/道具/钥匙_占位.png"
+dest_files=["res://.godot/imported/钥匙_占位.png-0ad5886ae5ed5ce2345f3f8dc70537e2.ctex"]
 
 [params]
 

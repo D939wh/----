@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b1olrekytsack"
-path="res://.godot/imported/蓝碗_占位.png-ef8e4d54bca37d6fd67335eaf90fa404.ctex"
+uid="uid://c3cd73nc6c0b8"
+path="res://.godot/imported/纸箱_占位.png-5be1b18ff110b4f7292a9276308ba1cf.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://素材控制/道具/蓝碗_占位.png"
-dest_files=["res://.godot/imported/蓝碗_占位.png-ef8e4d54bca37d6fd67335eaf90fa404.ctex"]
+source_file="res://素材/道具/纸箱_占位.png"
+dest_files=["res://.godot/imported/纸箱_占位.png-5be1b18ff110b4f7292a9276308ba1cf.ctex"]
 
 [params]
 
