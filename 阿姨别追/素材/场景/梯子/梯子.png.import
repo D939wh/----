@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b1olrekytsack"
-path="res://.godot/imported/蓝碗_占位.png-30be081683c9112edd5e77c8ae65cf43.ctex"
+uid="uid://dvy6hofdvg3wj"
+path="res://.godot/imported/梯子.png-2b31dcced9cd810d284d65995a592c48.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://素材/道具/蓝碗_占位.png"
-dest_files=["res://.godot/imported/蓝碗_占位.png-30be081683c9112edd5e77c8ae65cf43.ctex"]
+source_file="res://素材/场景/梯子/梯子.png"
+dest_files=["res://.godot/imported/梯子.png-2b31dcced9cd810d284d65995a592c48.ctex"]
 
 [params]
 

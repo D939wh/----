@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://doyrhatbglu8e"]
 
-[ext_resource type="Texture2D" uid="uid://c3cd73nc6c0b8" path="res://素材/道具/纸箱_占位.png" id="1_uv171"]
+[ext_resource type="Texture2D" uid="uid://c3cd73nc6c0b8" path="res://素材/道具/纸箱/纸箱_占位.png" id="1_uv171"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_pshna"]
 size = Vector2(18, 18)

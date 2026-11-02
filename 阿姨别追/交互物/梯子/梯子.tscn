@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bu704p01xw1bj"]
 
-[ext_resource type="Texture2D" uid="uid://dvy6hofdvg3wj" path="res://素材/场景/梯子.png" id="1_lad"]
+[ext_resource type="Texture2D" uid="uid://dvy6hofdvg3wj" path="res://素材/场景/梯子/梯子.png" id="1_lad"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ladder"]
 size = Vector2(32, 300)

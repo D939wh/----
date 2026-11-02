@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://jeg5w34hsggt"
-path="res://.godot/imported/钥匙_占位.png-0ad5886ae5ed5ce2345f3f8dc70537e2.ctex"
+uid="uid://b1olrekytsack"
+path="res://.godot/imported/蓝碗_占位.png-534faa21268a8e0aade25fc7c4a0cb64.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://素材/道具/钥匙_占位.png"
-dest_files=["res://.godot/imported/钥匙_占位.png-0ad5886ae5ed5ce2345f3f8dc70537e2.ctex"]
+source_file="res://素材/道具/蓝碗/蓝碗_占位.png"
+dest_files=["res://.godot/imported/蓝碗_占位.png-534faa21268a8e0aade25fc7c4a0cb64.ctex"]
 
 [params]
 

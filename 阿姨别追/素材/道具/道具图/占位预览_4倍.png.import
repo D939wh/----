@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dgix4ljkb2ye8"
-path="res://.godot/imported/钥匙_占位_原切.png-879539638f2eabfdfa44ead76bb6845d.ctex"
+uid="uid://ckcowmv01n0kv"
+path="res://.godot/imported/占位预览_4倍.png-175ce8e78a9f1b4b0b99f73b9671a675.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://素材/道具/钥匙_占位_原切.png"
-dest_files=["res://.godot/imported/钥匙_占位_原切.png-879539638f2eabfdfa44ead76bb6845d.ctex"]
+source_file="res://素材/道具/道具图/占位预览_4倍.png"
+dest_files=["res://.godot/imported/占位预览_4倍.png-175ce8e78a9f1b4b0b99f73b9671a675.ctex"]
 
 [params]
 

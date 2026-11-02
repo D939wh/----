@@ -1,7 +1,7 @@
 [gd_scene load_steps=6 format=3 uid="uid://b6ukmga7vqgmi"]
 
 [ext_resource type="PackedScene" uid="uid://dabl1bbaqf7bx" path="res://角色/学生/student.tscn" id="1_stu"]
-[ext_resource type="PackedScene" uid="uid://bu704p01xw1bj" path="res://交互物/梯子.tscn" id="3_ladder"]
+[ext_resource type="PackedScene" uid="uid://bu704p01xw1bj" path="res://交互物/梯子/梯子.tscn" id="3_ladder"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_floor"]
 size = Vector2(2000, 80)

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cs2q3bn3tq4fe"
-path="res://.godot/imported/道具.png-17d4de2657abb1e72889e18f8f91e135.ctex"
+uid="uid://c3cd73nc6c0b8"
+path="res://.godot/imported/纸箱_占位.png-448bab8e9b9ad60591bc6ccbb14ce9ea.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://素材/道具/道具.png"
-dest_files=["res://.godot/imported/道具.png-17d4de2657abb1e72889e18f8f91e135.ctex"]
+source_file="res://素材/道具/纸箱/纸箱_占位.png"
+dest_files=["res://.godot/imported/纸箱_占位.png-448bab8e9b9ad60591bc6ccbb14ce9ea.ctex"]
 
 [params]
 

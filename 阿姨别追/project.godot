@@ -32,17 +32,16 @@ enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg", "res://addons/godo
 [file_customization]
 
 folder_colors={
-"res://交互物/": "yellow",
-"res://参考资料/": "pink",
-"res://场景/": "blue",
-"res://宿管/": "purple",
-"res://游戏场景/": "green",
-"res://游戏效果控制/": "orange",
-"res://游戏角色/": "red",
-"res://界面/": "green",
-"res://素材/": "orange",
-"res://素材控制/": "pink",
-"res://角色/": "red",
+"res://场景/": "yellow",
+"res://场景/测试/": "teal",
+"res://角色/": "orange",
+"res://角色/学生/": "yellow",
+"res://角色/宿管/": "purple",
+"res://交互物/": "blue",
+"res://界面/": "pink",
+"res://界面/道具格/": "pink",
+"res://素材/": "red",
+"res://参考资料/": "gray",
 "res://调试工具/": "gray"
 }
 
