@@ -165,6 +165,15 @@ func _interact() -> void:
 		_drop_box()
 		return
 
+	# 门排最前：门挡着路的时候，先处理门 —— 扛着东西时不开门（手上没空）
+	# 谁按谁接管这扇门，学生手快（0.3秒），宿管手慢（1.5秒）
+	for area in $PickupZone.get_overlapping_areas():
+		if area.is_in_group("door"):
+			var door: Node = area.get_parent()
+			if door != null and door.has_method("press"):
+				door.press(self)
+			return
+
 	# 感应区里现在有哪些东西？先找可搬运的，再找可使用的
 	for area in $PickupZone.get_overlapping_areas():
 		if area.is_in_group("carryable"):

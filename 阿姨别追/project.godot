@@ -18,6 +18,7 @@ config/icon="res://素材/角色参考/icon.svg"
 [autoload]
 
 _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
+Director="*res://单例/场景总管.gd"
 
 [display]
 
@@ -33,9 +34,13 @@ enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg", "res://addons/godo
 
 folder_colors={
 "res://交互物/": "blue",
+"res://交互物/门/": "blue",
 "res://参考资料/": "gray",
+"res://单例/": "green",
 "res://场景/": "yellow",
 "res://场景/测试/": "teal",
+"res://场景/楼层代理/": "teal",
+"res://数据/": "amber",
 "res://界面/": "pink",
 "res://界面/道具格/": "pink",
 "res://素材/": "red",

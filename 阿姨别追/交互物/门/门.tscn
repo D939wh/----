@@ -1,0 +1,32 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://交互物/门/门.gd" id="1_door"]
+
+[sub_resource type="RectangleShape2D" id="Rect_blocker"]
+size = Vector2(64, 96)
+
+[sub_resource type="RectangleShape2D" id="Rect_zone"]
+size = Vector2(88, 128)
+
+[node name="Door" type="Node2D"]
+script = ExtResource("1_door")
+
+[node name="Panel" type="Polygon2D" parent="."]
+color = Color(0.42, 0.31, 0.22, 1)
+polygon = PackedVector2Array(-32, -96, 32, -96, 32, 0, -32, 0)
+
+[node name="Blocker" type="StaticBody2D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Blocker"]
+position = Vector2(0, -48)
+shape = SubResource("Rect_blocker")
+
+[node name="Zone" type="Area2D" parent="." groups=["door"]]
+collision_layer = 8
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Zone"]
+position = Vector2(0, -60)
+shape = SubResource("Rect_zone")
