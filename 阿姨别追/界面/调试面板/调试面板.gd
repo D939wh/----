@@ -45,8 +45,11 @@ func _unhandled_input(event: InputEvent) -> void:
 func _刷新(_谁: Node = null) -> void:
 	var who: Node = Director.当前控制
 	var 名字 := "（还没人报到）"
-	var 坐标 := ""
+	var 附加 := ""
 	if who != null and is_instance_valid(who):
 		名字 = who.name
-		坐标 = "\n位置：(%.0f, %.0f)" % [who.global_position.x, who.global_position.y]
-	_文字.text = "开发者模式\n当前控制：%s\nF1 换人%s" % [名字, 坐标]
+		附加 = "\n位置：(%.0f, %.0f)" % [who.global_position.x, who.global_position.y]
+		# 角色如果有「负重说明」就顺手显示出来（学生有，宿管没有）
+		if who.has_method("负重说明"):
+			附加 += "\n负重：" + str(who.负重说明())
+	_文字.text = "开发者模式\n当前控制：%s\nF1 换人%s" % [名字, 附加]

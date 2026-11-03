@@ -1,6 +1,7 @@
-[gd_scene format=3 uid="uid://doyrhatbglu8e"]
+[gd_scene load_steps=4 format=3 uid="uid://doyrhatbglu8e"]
 
 [ext_resource type="Texture2D" uid="uid://c3cd73nc6c0b8" path="res://素材/道具/纸箱/纸箱_占位.png" id="1_uv171"]
+[ext_resource type="Script" uid="uid://3ga3cqxwwvth" path="res://交互物/可搬运箱子/可搬运箱子.gd" id="2_box"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_pshna"]
 size = Vector2(18, 18)
@@ -8,6 +9,7 @@ size = Vector2(18, 18)
 [node name="CarryableBox" type="Area2D" unique_id=265815722 groups=["carryable"]]
 collision_layer = 8
 collision_mask = 0
+script = ExtResource("2_box")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=525113183]
 scale = Vector2(1.5, 1.5)

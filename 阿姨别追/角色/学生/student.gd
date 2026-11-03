@@ -39,7 +39,24 @@ enum CarryState { EMPTY, CARRYING }
 var _carry_state: CarryState = CarryState.EMPTY
 var _carried: Area2D = null             # 正扛着的那个箱子（空手时是 null）
 
-const CARRY_OFFSET := Vector2(14, -30)  # 扛着时箱子挂在身前的相对位置
+const CARRY_OFFSET := Vector2(14, -30)  # 扛在胸前的相对位置（轻/中重量）
+const DRAG_OFFSET := Vector2(18, -8)    # 拖在脚边的相对位置（重/超重）
+
+# ── W3 负重（2026-11-03）────────────────────────────────────
+# 扛起来之后，人被这件东西的重量拖住：走得慢、跳不高、爬不了梯。
+# 「多重算哪一档、每档罚多少」**全在 `数据/重量档位.gd` 那张表里**，
+# 这个文件只负责照表执行 —— 想调手感去改表，别改这里。
+# 每帧要用的四个数在拿起/放下时算好存下来，跑起来就不用反复查表了。
+const 重量档位 := preload("res://数据/重量档位.gd")
+
+var _负重公斤: float = 0.0        # 扛着的东西多重（空手 = 0）
+var _负重档名: String = "空手"    # "轻" / "中" / "重" / "超重" / "空手"
+var _移速倍率: float = 1.0        # 目标速度乘它
+var _跳跃高度倍率: float = 1.0    # 跳跃**高度**乘它（初速要开根，见起跳那段）
+var _可否慢走: bool = true        # 负重时禁 Shift
+var _可否攀爬: bool = true        # 中重量以上爬不了梯
+var _拖行: bool = false           # 只能拖在地上走（决定箱子挂在胸前还是脚边）
+
 
 # 道具格：null = 身上没东西；有图 = 有道具（右下角格子亮）
 var _item_icon: Texture2D = null
@@ -81,8 +98,11 @@ func _physics_process(delta: float) -> void:
 	var updown := Input.get_axis("up", "down")  # W/S：上爬 / 下爬
 
 	# 攀爬：碰到梯子 + 按了上下 → 开始爬（按过才挂住；没按过不会吸在梯子上）
-	if _on_ladder and updown != 0.0:
+	# 负重爬不了梯：中重量以上一律上不去（`数据/重量档位.gd` 里的「可否攀爬」）
+	if _on_ladder and updown != 0.0 and _可否攀爬:
 		_climbing = true
+	if _climbing and not _可否攀爬:
+		_climbing = false   # 手上扛着货，就算已经在梯子上也挂不住
 	if _on_ladder and _climbing:
 		velocity.y = updown * CLIMB_SPEED   # W 升 S 降；不按键 = 0 = 挂住
 		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
@@ -115,9 +135,10 @@ func _physics_process(delta: float) -> void:
 	_buffer = JUMP_BUFFER if Input.is_action_just_pressed("jump") else maxf(_buffer - delta, 0.0)
 	_sprint_cd = maxf(_sprint_cd - delta, 0.0)
 
-	#起跳
-	if _buffer > 0.0 and _coyote > 0.0:
-		velocity.y = JUMP_VELOCITY
+	#起跳（太重就跳不起来：档位表里「跳跃高度倍率」= 0 = 禁用）
+	# 注意乘的是「高度」的平方根：高度 h ∝ v²，想让高度减半，初速要乘 √0.5
+	if _buffer > 0.0 and _coyote > 0.0 and _跳跃高度倍率 > 0.0:
+		velocity.y = JUMP_VELOCITY * sqrt(_跳跃高度倍率)
 		_buffer = 0.0
 		_coyote = 0.0
 		_hang_left = 0.0    # 新跳清掉上一跳的定格/快落
@@ -138,9 +159,9 @@ func _physics_process(delta: float) -> void:
 		_sprint_left -= delta
 		velocity.x = _sprint_dir * SPRINT_SPEED
 	elif dir != 0.0:
-		#按住 Shift = 慢走；松手 = 快走
-		var slow_ok := sprint_held and is_on_floor()
-		var target := SLOW_SPEED if slow_ok else SPEED
+		#按住 Shift = 慢走；松手 = 快走（负重时禁慢走）
+		var slow_ok := sprint_held and is_on_floor() and _可否慢走
+		var target := (SLOW_SPEED if slow_ok else SPEED) * _移速倍率
 		var accel := SLOW_DECEL if slow_ok else ACCEL
 		var same_dir := signf(velocity.x) == signf(dir)
 		if not (not is_on_floor() and same_dir and absf(velocity.x) > target):
@@ -161,9 +182,9 @@ func _physics_process(delta: float) -> void:
 # ============================================================
 
 func _update_interaction() -> void:
-	# 扛着的箱子跟着人走（挂在身前）
+	# 扛着的箱子跟着人走（轻的抱在胸前，重的拖在脚边）
 	if _carry_state == CarryState.CARRYING and is_instance_valid(_carried):
-		_carried.position = CARRY_OFFSET
+		_carried.position = _扛着的位置()
 
 	if Input.is_action_just_pressed("interaction"):
 		_interact()
@@ -196,20 +217,56 @@ func _interact() -> void:
 			_pick_up_item(area)
 			return
 
-# 扛起箱子：变成箱子的父节点，位置摆在身前
+# 扛起箱子：变成箱子的父节点，位置摆在身前（超重的拖在地上）
+# 从这一行开始，人就被它的重量拖住了 —— 具体罚多少问 `数据/重量档位.gd`
 func _pick_up_box(box: Area2D) -> void:
 	_carried = box
 	_carry_state = CarryState.CARRYING
-	box.reparent(self, false)          # 认人做爹：从此跟着人走
-	box.position = CARRY_OFFSET
+	_应用负重(box.取重量() if box.has_method("取重量") else 0.0)
+	if box.has_method("设被扛着"):
+		box.设被扛着(true)                # 告诉它：别自己往下掉了
+	_climbing = false                     # 双手被占，梯子爬不了
+	box.reparent(self, false)             # 认人做爹：从此跟着人走
+	box.position = _扛着的位置()
 
-# 放下箱子：还回场景里，落在脚边
+# 放下箱子：还回场景里，落在脚边，然后它自己受重力落到地面
 func _drop_box() -> void:
 	var box := _carried
 	_carried = null
 	_carry_state = CarryState.EMPTY
-	box.reparent(get_parent(), false)  # 交还给场景
-	box.global_position = global_position + Vector2(18, -8)  # 放身前脚边
+	box.reparent(get_parent(), false)     # 交还给场景
+	# 学生自己的原点就在脚底（碰撞体从 -44 到 0），所以这里减一个箱子的半高就贴地了
+	box.global_position = global_position + Vector2(18, -12)
+	if box.has_method("设被扛着"):
+		box.设被扛着(false)               # 从这里开始它自己受重力
+	_应用负重(0.0)                        # 人轻松了，速度/跳跃全恢复
+
+# 按公斤把重量换成"这一趟会被罚成什么样"。拿起/放下各算一次，跑起来只读缓存
+func _应用负重(公斤: float) -> void:
+	_负重公斤 = 公斤
+	_负重档名 = "空手" if 公斤 <= 0.0 else 重量档位.档名(公斤)
+	var 档: Dictionary = 重量档位.空手() if 公斤 <= 0.0 else 重量档位.取(公斤)
+	_移速倍率 = float(档["移速倍率"])
+	_跳跃高度倍率 = float(档["跳跃高度倍率"])
+	_可否慢走 = bool(档["可否慢走"])
+	_可否攀爬 = bool(档["可否攀爬"])
+	_拖行 = bool(档["拖行"])
+
+# 抱在胸前还是拖在脚边？看档位表里的「拖行」
+func _扛着的位置() -> Vector2:
+	return DRAG_OFFSET if _拖行 else CARRY_OFFSET
+
+# 给左上角调试面板看的：现在扛着几公斤、被罚成什么样
+func 负重说明() -> String:
+	if _carry_state == CarryState.EMPTY:
+		return "空手"
+	return "%s %.0fkg｜速度 %d%%｜%s｜%s" % [
+		_负重档名,
+		_负重公斤,
+		roundi(_移速倍率 * 100.0),
+		"能跳" if _跳跃高度倍率 >= 1.0 else ("跳一半高" if _跳跃高度倍率 > 0.0 else "不能跳"),
+		"能爬梯" if _可否攀爬 else "不能爬梯",
+	]
 
 # 捡道具：图记进道具格，地上的物件消失
 func _pick_up_item(item: Area2D) -> void:
