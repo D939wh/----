@@ -7,6 +7,8 @@
 [ext_resource type="PackedScene" uid="uid://doyrhatbglu8e" path="res://交互物/可搬运箱子/可搬运箱子.tscn" id="5_nuk2p"]
 [ext_resource type="PackedScene" path="res://界面/道具格/道具格.tscn" id="6_hud"]
 [ext_resource type="Script" uid="uid://pomh1n5mlmpq" path="res://场景/楼层代理/楼层代理.gd" id="7_agent"]
+[ext_resource type="PackedScene" path="res://角色/宿管/宿管.tscn" id="8_keeper"]
+[ext_resource type="PackedScene" path="res://界面/调试面板/调试面板.tscn" id="9_dbg"]
 
 [node name="Node2D" type="Node2D" unique_id=1549066768]
 
@@ -27,6 +29,11 @@ position = Vector2(1230, 182)
 position = Vector2(1010, 186)
 
 [node name="HUD" parent="." instance=ExtResource("6_hud")]
+
+[node name="keeper" parent="." instance=ExtResource("8_keeper")]
+position = Vector2(1500, 178)
+
+[node name="DebugPanel" parent="." instance=ExtResource("9_dbg")]
 
 [node name="FloorAgent" type="Node2D" parent="."]
 script = ExtResource("7_agent")

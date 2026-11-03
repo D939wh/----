@@ -55,6 +55,8 @@ var _fast_fall: bool = false  # 定格结束后处于快落中
 func _ready() -> void:
 	$ClimbZone.area_entered.connect(_on_climb_enter)
 	$ClimbZone.area_exited.connect(_on_climb_exit)
+	# 向总管报到：我可以被玩家控制。学生先出生，所以默认控制权默认在他身上
+	Director.register_controllable(self)
 
 func _on_climb_enter(_area: Area2D) -> void:
 	_on_ladder = true   # 碰到梯子（还不算挂着，要看有没有按上下键）
@@ -64,6 +66,16 @@ func _on_climb_exit(_area: Area2D) -> void:
 	_climbing = false   # 离开梯子，爬的记性清零
 
 func _physics_process(delta: float) -> void:
+	# 开发者模式（2026-11-03）：F1 切到宿管身上时，学生原地站住。
+	# 不吃键盘，但重力照常 —— 不会浮在半空，也不会自己走路。
+	# 这一整段只在「有人接管了控制权」时才起作用，正常单人玩永远是 false。
+	if Director.当前控制 != null and Director.当前控制 != self:
+		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
+		if not is_on_floor():
+			velocity.y += GRAVITY * delta
+		move_and_slide()
+		return
+
 	var dir := Input.get_axis("left", "right")  #左右移动
 	var sprint_held := Input.is_action_pressed("sprint")  # 按住 Shift（按住=慢走）
 	var updown := Input.get_axis("up", "down")  # W/S：上爬 / 下爬

@@ -1,0 +1,64 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://角色/宿管/宿管.gd" id="1_keeper"]
+[ext_resource type="Texture2D" uid="uid://bwwrtdf50eed0" path="res://素材/角色参考/icon.svg" id="2_icon"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_keeper"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("2_icon")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 5.0
+}]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(24, 48)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_climb"]
+size = Vector2(18, 58)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_zone"]
+size = Vector2(96, 96)
+
+[node name="宿管" type="CharacterBody2D"]
+script = ExtResource("1_keeper")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+modulate = Color(1, 0.45, 0.45, 1)
+position = Vector2(0, -24)
+scale = Vector2(0.36, 0.36)
+sprite_frames = SubResource("SpriteFrames_keeper")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(0, -32)
+zoom = Vector2(1.5, 1.5)
+position_smoothing_enabled = true
+position_smoothing_speed = 8.0
+rotation_smoothing_enabled = true
+drag_left_margin = 0.18
+drag_top_margin = 0.06
+drag_right_margin = 0.18
+drag_bottom_margin = 0.06
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -24)
+shape = SubResource("RectangleShape2D_body")
+
+[node name="ClimbZone" type="Area2D" parent="."]
+position = Vector2(0, -24)
+collision_layer = 0
+collision_mask = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ClimbZone"]
+shape = SubResource("RectangleShape2D_climb")
+
+[node name="PickupZone" type="Area2D" parent="."]
+position = Vector2(0, -24)
+collision_layer = 0
+collision_mask = 8
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="PickupZone"]
+shape = SubResource("RectangleShape2D_zone")

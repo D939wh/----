@@ -53,3 +53,66 @@ func floor_of(_node: Node) -> String:
 ## 调试用：把当前登记了哪几层打出来
 func dump() -> void:
 	print("[总管] 当前楼层表：", _floors.keys())
+
+
+# ============================================================
+# 控制权（开发者模式用，2026-11-03 加）
+# ------------------------------------------------------------
+# 现在玩家手里操作的是谁。按 F1 在学生和宿管之间来回换。
+#
+# 这里只管一件事：「谁吃键盘」。镜头也跟着换。
+# 以后宿管交给 AI 的时候，改的是「谁在替她按键」，这个接口不用动。
+# ============================================================
+
+## 当前被玩家控制的角色（null = 还没人报到）
+var 当前控制: Node = null
+
+## 换人了。调试面板听到这个信号就刷新显示
+signal control_changed(who: Node)
+
+## 所有能控制的角色，按出场顺序存着（学生先报到，所以是第 0 个）
+var _controllables: Array[Node] = []
+
+
+## 角色出生时自己来报到（在 _ready 里喊一句就行）
+func register_controllable(who: Node) -> void:
+	if who in _controllables:
+		return
+	_controllables.append(who)
+	if 当前控制 == null:
+		当前控制 = who
+	# 每来一个都重设一遍镜头：保证「只有当前控制的那个人」的相机是开的。
+	# 不然新出生的人会带着自己的相机一起开着，两个人抢镜头。
+	_相机交给(当前控制)
+	control_changed.emit(当前控制)
+	print("[总管] 可控制角色报到：%s（现在共 %d 个）" % [who.name, _controllables.size()])
+
+
+## 按 F1 调这个：换到下一个角色，转一圈回到第一个
+func switch_control() -> void:
+	if _controllables.size() < 2:
+		print("[总管] 现在只有一个可控制角色，没得换")
+		return
+	var 旧的: Node = 当前控制
+	var i := _controllables.find(当前控制)
+	当前控制 = _controllables[(i + 1) % _controllables.size()]
+	# 把旧角色身上的速度清干净：不然切走之后她还会顺着惯性滑一段，
+	# 调试时容易看成「她怎么自己动了」。
+	if 旧的 != null and 旧的 is CharacterBody2D:
+		旧的.velocity = Vector2.ZERO
+	_相机交给(当前控制)
+	control_changed.emit(当前控制)
+	print("[总管] 换人 —— 现在控制：%s" % 当前控制.name)
+
+
+## 把镜头交给它。每个角色自带一个相机，同一时刻只开一个
+func _相机交给(who: Node) -> void:
+	for one in _controllables:
+		var cam := one.get_node_or_null("Camera2D")
+		if cam != null:
+			cam.enabled = (one == who)
+	if who == null:
+		return
+	var cam := who.get_node_or_null("Camera2D")
+	if cam != null:
+		cam.make_current()
