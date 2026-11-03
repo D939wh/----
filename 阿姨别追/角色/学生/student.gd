@@ -39,8 +39,8 @@ enum CarryState { EMPTY, CARRYING }
 var _carry_state: CarryState = CarryState.EMPTY
 var _carried: Area2D = null             # 正扛着的那个箱子（空手时是 null）
 
-const CARRY_OFFSET := Vector2(14, -30)  # 扛在胸前的相对位置（轻/中重量）
-const DRAG_OFFSET := Vector2(18, -8)    # 拖在脚边的相对位置（重/超重）
+const CARRY_OFFSET := Vector2(14, -30)  # 抱在胸前的相对位置（1、2 档）
+const DRAG_OFFSET := Vector2(18, -8)    # 拖在脚边的相对位置（3、4 档）
 
 # ── W3 负重（2026-11-03）────────────────────────────────────
 # 扛起来之后，人被这件东西的重量拖住：走得慢、跳不高、爬不了梯。
@@ -50,11 +50,11 @@ const DRAG_OFFSET := Vector2(18, -8)    # 拖在脚边的相对位置（重/超�
 const 重量档位 := preload("res://数据/重量档位.gd")
 
 var _负重公斤: float = 0.0        # 扛着的东西多重（空手 = 0）
-var _负重档名: String = "空手"    # "轻" / "中" / "重" / "超重" / "空手"
+var _负重档名: String = "空手"    # "1 档" / "2 档" / "3 档" / "4 档" / "空手"
 var _移速倍率: float = 1.0        # 目标速度乘它
 var _跳跃高度倍率: float = 1.0    # 跳跃**高度**乘它（初速要开根，见起跳那段）
 var _可否慢走: bool = true        # 负重时禁 Shift
-var _可否攀爬: bool = true        # 中重量以上爬不了梯
+var _可否攀爬: bool = true        # 2 档以上爬不了梯
 var _拖行: bool = false           # 只能拖在地上走（决定箱子挂在胸前还是脚边）
 
 
@@ -98,7 +98,7 @@ func _physics_process(delta: float) -> void:
 	var updown := Input.get_axis("up", "down")  # W/S：上爬 / 下爬
 
 	# 攀爬：碰到梯子 + 按了上下 → 开始爬（按过才挂住；没按过不会吸在梯子上）
-	# 负重爬不了梯：中重量以上一律上不去（`数据/重量档位.gd` 里的「可否攀爬」）
+	# 负重爬不了梯：2 档以上一律上不去（`数据/重量档位.gd` 里的「可否攀爬」）
 	if _on_ladder and updown != 0.0 and _可否攀爬:
 		_climbing = true
 	if _climbing and not _可否攀爬:
@@ -244,7 +244,7 @@ func _drop_box() -> void:
 # 按公斤把重量换成"这一趟会被罚成什么样"。拿起/放下各算一次，跑起来只读缓存
 func _应用负重(公斤: float) -> void:
 	_负重公斤 = 公斤
-	_负重档名 = "空手" if 公斤 <= 0.0 else 重量档位.档名(公斤)
+	_负重档名 = "空手" if 公斤 <= 0.0 else 重量档位.档位全名(公斤)
 	var 档: Dictionary = 重量档位.空手() if 公斤 <= 0.0 else 重量档位.取(公斤)
 	_移速倍率 = float(档["移速倍率"])
 	_跳跃高度倍率 = float(档["跳跃高度倍率"])
