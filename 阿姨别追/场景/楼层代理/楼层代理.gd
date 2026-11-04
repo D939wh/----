@@ -23,14 +23,14 @@ func _ready() -> void:
 	_seed_doors()
 
 
-## 照清单把门建出来。位置全部来自数据文件，脚本里没有写死任何一个坐标
+## 照清单把门建出来。位置、开门用时全部来自数据文件，脚本里没有写死任何一个数字
 func _seed_doors() -> void:
 	var data: Dictionary = 清单.楼层.get(floor_id, {})
 	var door_list: Array = data.get("门", [])
 	for one in door_list:
 		var d: Node2D = 门场景.instantiate()
 		add_child(d)
-		d.setup(floor_id, one["编号"], one["位置"])
+		d.setup(floor_id, one["编号"], one["位置"], 清单.开门用时(one))
 		_doors[one["编号"]] = d
 	print("[代理·%s] 照清单建了 %d 扇门" % [floor_id, _doors.size()])
 

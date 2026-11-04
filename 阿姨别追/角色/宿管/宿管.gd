@@ -7,8 +7,8 @@ extends CharacterBody2D
 ## 她跟学生的三个不同：
 ##   1. 走得更快：370 vs 315（策划案 5.4 : 4.6 m/s，按学生的 315 反算）
 ##   2. 不捡东西、不搬箱子 —— 她的 E 只用来开门，捡不起来任何东西
-##   3. 她在 "keeper" 组里。门看到这个组就按 1.5 秒慢慢开（学生是 0.3 秒）
-##      —— 这个判断在 门.gd 里，本文件不用管，加个组就自动生效
+##   3. 她在 "keeper" 组里。门看到这个组，就去清单里取「宿管」那一行的时长
+##      （1.5 秒，学生是 0.3 秒）—— 数字在 数据/楼层清单.gd，不在这个文件里，也不在门里
 ##
 ## 改动手感：只改下面带「←调这里」的那几行，改完存盘 F5 立刻见效。
 
@@ -41,7 +41,9 @@ var _fast_fall: bool = false
 
 
 func _ready() -> void:
-	add_to_group("keeper")            # ← 这一句就是「宿管开门慢」的全部秘密
+	# 门靠这个认出「推门的是宿管」，然后去清单里取宿管那一行的时长。
+	# 这一句只说明「我是谁」，不说明「我多快」—— 多快是场景数据。
+	add_to_group("keeper")
 	$ClimbZone.area_entered.connect(_on_climb_enter)
 	$ClimbZone.area_exited.connect(_on_climb_exit)
 	Director.register_controllable(self)   # 向总管报到：我可以被玩家控制
@@ -129,10 +131,11 @@ func _physics_process(delta: float) -> void:
 
 
 ## E 键只做一件事：开/关面前那扇门。她捡不了东西，也搬不了箱子
+## 注意：这里没有「宿管开门 1.5 秒」这种数字。她只是递申请，快慢由门照清单决定。
 func _开门() -> void:
 	for area in $PickupZone.get_overlapping_areas():
 		if area.is_in_group("door"):
 			var door: Node = area.get_parent()
 			if door != null and door.has_method("press"):
-				door.press(self)   # 门会认出我是 keeper，自动按 1.5 秒算
+				door.press(self)   # 说完这一句就没我的事了，门自己慢慢开
 			return

@@ -302,7 +302,8 @@ func _interact() -> void:
 	# 第二步：门排在最前——门挡着路的时候先处理门。
 	# 为什么门比箱子优先：扛着东西本来就走不快，要是被门卡住还开不了，
 	# 玩家会觉得"这游戏坏了"。所以门永远第一个响应。
-	# 谁按谁接管这扇门，速度差在人的身上：学生 0.3 秒，宿管 1.5 秒。
+	# 谁按谁接管这扇门。开多快不归我管，也不挂在人身上 ——
+	# 门的时长写在 数据/楼层清单.gd（每扇门可以不一样），门自己查表、自己开。
 	for area in $PickupZone.get_overlapping_areas():
 		if area.is_in_group("door"):
 			var door: Node = area.get_parent()
