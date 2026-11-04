@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dwvhuuin2hbd0"
-path="res://.godot/imported/宿管_左右朝向.png-0079aa419349146f3078b214830c54a2.ctex"
+uid="uid://cix0arsdpb4qd"
+path="res://.godot/imported/宿管_姿态.png-8bfad76c288d4cce9ee8b0471e936770.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://素材/生图/宿管_左右朝向.png"
-dest_files=["res://.godot/imported/宿管_左右朝向.png-0079aa419349146f3078b214830c54a2.ctex"]
+source_file="res://素材/生图/宿管_姿态.png"
+dest_files=["res://.godot/imported/宿管_姿态.png-8bfad76c288d4cce9ee8b0471e936770.ctex"]
 
 [params]
 

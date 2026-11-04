@@ -1,25 +1,16 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://角色/宿管/宿管.gd" id="1_keeper"]
-[ext_resource type="Texture2D" path="res://素材/生图/宿管_姿态A.png" id="2_pose_a"]
-[ext_resource type="Texture2D" path="res://素材/生图/宿管_姿态B.png" id="3_pose_b"]
+[ext_resource type="Texture2D" path="res://素材/生图/宿管_姿态.png" id="2_pose"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_keeper"]
 animations = [{
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("2_pose_a")
+"texture": ExtResource("2_pose")
 }],
 "loop": 1,
-"name": &"朝右",
-"speed": 5.0
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": ExtResource("3_pose_b")
-}],
-"loop": 1,
-"name": &"朝左",
+"name": &"待机",
 "speed": 5.0
 }]
 
@@ -37,9 +28,9 @@ script = ExtResource("1_keeper")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 position = Vector2(0, -24)
-scale = Vector2(0.075, 0.075)
+scale = Vector2(0.05, 0.05)
 sprite_frames = SubResource("SpriteFrames_keeper")
-animation = &"朝右"
+animation = &"待机"
 
 [node name="Camera2D" type="Camera2D" parent="."]
 position = Vector2(0, -32)

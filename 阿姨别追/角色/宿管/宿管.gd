@@ -67,7 +67,7 @@ func _ready() -> void:
 	# 门靠这个认出「推门的是宿管」，然后去清单里取宿管那一行的时长。
 	# 这一句只说明「我是谁」，不说明「我多快」—— 多快是场景数据。
 	add_to_group("keeper")
-	$AnimatedSprite2D.play("朝右")   # 出生默认面朝右（贴图两个动画：朝右/朝左）
+	$AnimatedSprite2D.play("待机")   # 生图只有一张朝右的姿态，朝左用水平翻转
 	$ClimbZone.area_entered.connect(_on_climb_enter)
 	$ClimbZone.area_exited.connect(_on_climb_exit)
 	Director.register_controllable(self)   # 向总管报到：我可以被玩家控制
@@ -222,13 +222,13 @@ func _开门() -> void:
 # ============================================================
 
 ## 每帧更新朝向：按住方向键的哪边就面朝哪边（没按就维持上一次的）
-## 贴图切两个动画：朝右 / 朝左（百炼生图，黑底已离线抠掉）。
-## 要是主人看出两边反了，把下面两行的「朝右」「朝左」对调即可。
+## 贴图是百炼生成的一张**朝右**侧身像（粉底已离线抠掉），朝左就把图水平翻转。
+## 要是主人看出方向反了，把下面 flip_h 那一行改成 `= d > 0.0` 即可。
 func _更新朝向() -> void:
 	var d := signf(Input.get_axis("left", "right"))
-	if d != 0.0 and d != _swing_dir:
+	if d != 0.0:
 		_swing_dir = d
-		$AnimatedSprite2D.play("朝右" if d > 0.0 else "朝左")
+		$AnimatedSprite2D.flip_h = d < 0.0
 
 ## 朝面对方向挥一记扫把：站定、扇形射线扫一遍，打中学生就掉她一格血
 func _挥击() -> void:
@@ -248,9 +248,10 @@ func _挥击() -> void:
 
 
 ## 挥击那一下闪出的范围（跟判定扇形同尺寸：200px × 120°，从胸口张开）
-## 两层一起闪：① 淡金扇形 = 真实判定范围（一眼看出打得到哪）
-##             ② 百炼生成的弧光图（白底已离线抠掉）= 好看的部分
-## 挥完 0.18 秒淡出消失。图是「随便先做一点」的占位，主人看效果再定。
+## 两层：① 淡金扇形 = 真实判定范围（一眼看出打得到哪）
+##       ② 扩散光弧 = 打击感（程序画的：线沿扇形边缘扩张并淡出）
+## 为什么不用 AI 特效图：生成的图不可控（上一版出来是白底黑涂鸦），
+## 而且程序画的尺寸能跟判定 100% 对齐，还不花生图额度。
 func 闪一下攻击范围() -> void:
 	var 弧 := SWING_ARC * deg_to_rad(1.0)
 	var 每步 := 弧 / 12.0
@@ -260,32 +261,32 @@ func 闪一下攻击范围() -> void:
 		var a := -弧 * 0.5 + 每步 * i
 		点.append(Vector2(_swing_dir, 0.0).rotated(a) * SWING_RANGE)
 
-	# ① 真实判定范围：一层淡金扇形
+	# ① 真实判定范围：淡金扇形
 	var poly := Polygon2D.new()
 	poly.polygon = 点
-	poly.color = Color(1.0, 0.82, 0.3, 0.30)
+	poly.color = Color(1.0, 0.82, 0.3, 0.28)
 	poly.position = Vector2(0, -26)
 	add_child(poly)
 
-	# ② 弧光图：缩到 400px 宽、胸口居中
-	var spr := Sprite2D.new()
-	spr.texture = 预载特效图
-	var 缩放 := 400.0 / float(spr.texture.get_width())
-	spr.scale = Vector2(缩放, 缩放)
-	spr.position = Vector2(0, -26)
-	spr.modulate = Color(1, 1, 1, 0.95)
-	add_child(spr)
+	# ② 打击感：沿扇形外缘一条光弧，向外张开 + 淡出
+	var line := Line2D.new()
+	line.width = 5.0
+	line.default_color = Color(1, 0.95, 0.7, 0.95)
+	var 弧点 := PackedVector2Array()
+	for i in range(25):
+		var a := -弧 * 0.5 + 弧 * (float(i) / 24.0)
+		弧点.append(Vector2(_swing_dir, 0.0).rotated(a) * SWING_RANGE * 0.88)
+	line.points = 弧点
+	line.position = Vector2(0, -26)
+	add_child(line)
 
-	var tw := create_tween()
-	tw.tween_property(poly, "modulate:a", 0.0, 0.18).set_delay(0.06)
-	tw.tween_property(spr, "modulate:a", 0.0, 0.18).set_delay(0.06)
-	tw.tween_callback(func() -> void:
-		poly.queue_free()
-		spr.queue_free()
-	)
-
-## 特效贴图只载一次（所有挥击共用这张图）
-var 预载特效图: Texture2D = load("res://素材/生图/挥击特效_透明.png")
+	var tw1 := create_tween()
+	tw1.tween_property(poly, "modulate:a", 0.0, 0.2).set_delay(0.05)
+	tw1.tween_callback(poly.queue_free)
+	var tw2 := create_tween()
+	tw2.tween_property(line, "modulate:a", 0.0, 0.2)
+	tw2.parallel().tween_property(line, "scale", Vector2(1.12, 1.12), 0.2)
+	tw2.tween_callback(line.queue_free)
 
 
 ## 身前 2 米 × 120° 扇形里有没有学生？射线一把（12 条），谁近打谁
