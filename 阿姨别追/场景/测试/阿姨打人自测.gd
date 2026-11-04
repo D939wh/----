@@ -52,15 +52,14 @@ func _ready() -> void:
 	Input.action_release("right")
 	r["瘫了走不动"] = "宿管位移 %.0f（后摇中应为 0）" % (k.global_position.x - 900.0)
 
-	# —— CD 过去，贴身（20px）按住 G 读条 1.2 秒 → 扛上肩 ——
+	# —— CD 过去，贴身（20px）按一下 G → 直接扛上肩（20:01 改成一键，不再读条）——
 	await _wait(1.0)
 	k.global_position = Vector2(940, 208)
 	await _wait(0.1)
-	Input.action_press("grab")
-	await _wait(1.4)
-	r["读完条"] = "宿管扛着人=%s / 学生被扛=%s / 学生父节点=%s" % [
+	await _tap_g()
+	await _wait(0.2)
+	r["一键扛起"] = "宿管扛着人=%s / 学生被扛=%s / 学生父节点=%s" % [
 		k._carried_student != null, s.被扛着, s.get_parent().name]
-	Input.action_release("grab")
 
 	# —— 扛着人走：移速应 370×0.6=222，0.5 秒走约 100+px ——
 	var before := k.global_position.x
@@ -82,17 +81,6 @@ func _ready() -> void:
 	var 在地面: bool = absf(s.global_position.y - k.global_position.y) < 8.0
 	r["放下判in"] = "在脚边=%s / 在地面=%s" % [在脚边, 在地面]
 
-	# —— 打断验证：再按住 G 读条，读到一半走开 → 进度清零、扛不成 ——
-	await _wait(1.3)   # 等挥击 CD 过去
-	k.global_position = Vector2(940, 208)
-	await _wait(0.1)
-	Input.action_press("grab")
-	await _wait(0.6)                       # 读到一半（0.6 < 1.2）
-	k.global_position = Vector2(1140, 208)  # 宿管瞬移走开（超 60px 判定线）
-	await _wait(0.3)
-	Input.action_release("grab")
-	r["打断验证"] = "读条进度 %.2f（应清零为 0）/ 扛着人=%s（应 false）" % [
-		k._grab_progress, k._carried_student != null]
 
 	# —— 朝向验证：宿管先向左走（面朝左），学生对齐到她左侧，按 F 应朝左命中 ——
 	await _wait(1.3)   # 等挥击 CD

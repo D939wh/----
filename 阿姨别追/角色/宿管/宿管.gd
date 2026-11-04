@@ -33,25 +33,19 @@ const CLIMB_OFF_JUMP: float = -180.0
 
 # ── 挥击 / 抓捕 / 扛人（W2D2，2026-11-04）────────────────────
 # 策划案原数：挥击身前 2 米 × 120° 扇形、1 格伤害、站定才能挥、
-# 后摇 0.8 秒、CD 1.2 秒；抓捕贴身长按 1.2 秒读条，被打断则重置。
-# 学生拎人移速 −40% 不变（370 × 0.6 = 222）、不能爬梯。
-# 素材后面有，挥击动画先用现有帧占位（打中那一下学生变红半透明）。
+# 后摇 0.8 秒、CD 1.2 秒；拎人移速 −40%（370 × 0.6 = 222）、不能爬梯。
+# 20:01 主人改：抓捕不再是「按住读条」——学生瘫痪后按 G **一键直接扛**。
 const SWING_RANGE: float = 200.0        # 挥击距离（像素）。2 米 × 100 像素/米
 const SWING_ARC: float = 120.0          # 扇形角度（度）
 const SWING_RAYS: int = 12              # 扇形里打几条射线（越多越密，12 条足够）
 const SWING_RECOVER: float = 0.8        # 后摇：挥完这秒内不能再挥、不能动
 const SWING_CD: float = 1.2             # 冷却：从挥出起算，隔这秒才能再挥
-const GRAB_TIME: float = 1.2            # 抓捕读条总时长（秒）
-const GRAB_RANGE: float = 40.0          # 多近算「贴身」（像素）
 const CARRY_STUDENT_OFFSET := Vector2(14, -34)  # 学生扛在肩上的相对位置
 const CARRY_SPEED_MULT: float = 0.6     # 扛人时移速乘它（策划案 −40%）
 
 var _swing_cd_left: float = 0.0         # 挥击冷却还剩几秒
 var _swing_recover_left: float = 0.0    # 后摇还剩几秒（>0 时不能动）
 var _swing_dir: float = 1.0             # 面朝哪边（1 右 / -1 左）。出生默认朝右，之后随方向键更新
-var _grabbing: bool = false             # 正在长按读条抓人？
-var _grab_target: Node = null           # 读条目标是哪个学生
-var _grab_progress: float = 0.0         # 读条进度（0~1）
 var _carried_student: Node = null       # 正扛着哪个学生（null = 空肩）
 
 var _on_ladder: bool = false
@@ -88,6 +82,10 @@ func _受控() -> bool:
 
 
 func _physics_process(delta: float) -> void:
+	# 计时器照走，跟「现在谁被控制」无关 —— 不然切走再切回来会先僵 0.8 秒
+	_swing_cd_left = maxf(_swing_cd_left - delta, 0.0)
+	_swing_recover_left = maxf(_swing_recover_left - delta, 0.0)
+
 	# 没被控制时：不吃键盘，但照常受重力，不会浮在空中
 	if not _受控():
 		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
@@ -118,37 +116,19 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("open_door"):
 		_开门()
 
-	# ── W2D2 · 键位各管一件事（18:51 主人验收定的：攻击/搬运分开）──
+	# ── W2D2 · 键位各管一件事（20:01 主人定的：攻击/搬运分开，搬运一键）──
 	#   F（interaction）→ 只挥击（攻击）
-	#   G（grab）       → 只扛人：扛着就放下；贴身有瘫痪学生就按住读条扛上肩
+	#   G（grab）       → 只扛人：扛着就放下；贴身有瘫痪学生就**一键直接扛**
 	_更新朝向()
 	if Input.is_action_just_pressed("interaction"):
 		_挥击()
 	if Input.is_action_just_pressed("grab"):
 		if _carried_student != null:
 			_放下学生()
-		elif _贴身瘫痪学生() != null:
-			_grabbing = true
-			_grab_target = _贴身瘫痪学生()
-			_grab_progress = 0.0
-			print("[宿管] 开始抓捕读条（按住 G 别松）")
-
-	# ── 读条推进：按住 G 且目标还在贴身范围内，1.2 秒满 → 扛上肩 ──
-	if _grabbing:
-		if not Input.is_action_pressed("grab") or _grab_target == null \
-				or not is_instance_valid(_grab_target) \
-				or global_position.distance_to(_grab_target.global_position) > GRAB_RANGE * 1.5:
-			print("[宿管] 抓捕被打断，进度清零")
-			_grabbing = false
-			_grab_target = null
-			_grab_progress = 0.0
 		else:
-			_grab_progress += delta / GRAB_TIME
-			if _grab_progress >= 1.0:
-				_扛起(_grab_target)
-				_grabbing = false
-				_grab_target = null
-				_grab_progress = 0.0
+			var 目标 := _贴身瘫痪学生()
+			if 目标 != null:
+				_扛起(目标)
 
 	# ── 重力 ──
 	if not is_on_floor():
@@ -178,20 +158,16 @@ func _physics_process(delta: float) -> void:
 		velocity.y *= JUMP_CUT
 
 	# ── 左右速度 ──
-	# 三个状态影响移速：后摇站定（挥完那 0.8 秒）、扛人 ×0.6（策划案 −40%）、读条时站定
+	# 两个状态影响移速：后摇站定（挥完那 0.8 秒）、扛人 ×0.6（策划案 −40%）
 	var 走速 := SPEED
 	if _carried_student != null:
 		走速 = SPEED * CARRY_SPEED_MULT
-	if dir != 0.0 and _swing_recover_left <= 0.0 and not _grabbing:
+	if dir != 0.0 and _swing_recover_left <= 0.0:
 		var same_dir := signf(velocity.x) == signf(dir)
 		if not (not is_on_floor() and same_dir and absf(velocity.x) > 走速):
 			velocity.x = move_toward(velocity.x, dir * 走速, ACCEL * delta)
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
-
-	# ── 挥击冷却/后摇计时（每帧减一点）──
-	_swing_cd_left = maxf(_swing_cd_left - delta, 0.0)
-	_swing_recover_left = maxf(_swing_recover_left - delta, 0.0)
 
 	# 扛着学生时，把他摆到肩上（位置每帧算，跟学生搬箱子同一个套路）
 	if _carried_student != null and is_instance_valid(_carried_student):

@@ -44,6 +44,10 @@ var _climbing: bool = false  # 这一趟真的按过上下键在爬了吗（没�
 # 素材后面会换，现在「瘫痪」先用 变红+半透明 占位（红得像被打青了一样）。
 const MAX_HP: int = 2                      # 血量上限（格子数，不是小数）
 const 瘫痪变色 := Color(1.0, 0.35, 0.35, 0.6)  # 占位色：红 + 半透明，等美术素材
+## 瘫痪时身体换到第 2 层：宿管身体只认第 1 层，跨得过去不会被她绊住；
+## 但宿管的感应区（mask 11 = 1+2）照样能看见她，好按 G 扛起来。
+const 正常碰撞层: int = 1
+const 瘫痪碰撞层: int = 2
 
 var 血量: int = MAX_HP                     # 现在还剩几格
 var 瘫痪: bool = false                     # 两格打空了？瘫了不能动
@@ -363,6 +367,7 @@ func 被打中() -> void:
 func _瘫了() -> void:
 	瘫痪 = true
 	velocity = Vector2.ZERO
+	collision_layer = 瘫痪碰撞层   # 瘫在地上，别人能跨过去（不然整条走廊被她堵死）
 	$AnimatedSprite2D.modulate = 瘫痪变色
 	print("[学生] 我瘫了（%d/%d 格）" % [血量, MAX_HP])
 
@@ -391,5 +396,6 @@ func _set_collision_disabled(禁用: bool) -> void:
 func 拉起() -> void:
 	血量 = MAX_HP
 	瘫痪 = false
+	collision_layer = 正常碰撞层   # 站起来又能挡人了
 	$AnimatedSprite2D.modulate = Color.WHITE
 	print("[学生] 恢复了（%d/%d 格）" % [血量, MAX_HP])
