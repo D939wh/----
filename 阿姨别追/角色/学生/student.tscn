@@ -1,13 +1,13 @@
 [gd_scene format=3 uid="uid://dabl1bbaqf7bx"]
 
 [ext_resource type="Script" uid="uid://jsrsy436jrhg" path="res://角色/学生/student.gd" id="1_77438"]
-[ext_resource type="Texture2D" uid="uid://bwwrtdf50eed0" path="res://素材/角色参考/icon.svg" id="1_p1ren"]
+[ext_resource type="Texture2D" uid="uid://bskir84bihvkp" path="res://素材/角色参考/355d4aca7d49ebbdcdae245fd3338a31.png" id="2_ncbn4"]
 
-[sub_resource type="SpriteFrames" id="SpriteFrames_3f5lc"]
+[sub_resource type="SpriteFrames" id="SpriteFrames_37git"]
 animations = [{
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("1_p1ren")
+"texture": ExtResource("2_ncbn4")
 }],
 "loop": 1,
 "name": &"default",
@@ -26,10 +26,9 @@ size = Vector2(96, 96)
 [node name="student" type="CharacterBody2D" unique_id=1178503731]
 script = ExtResource("1_77438")
 
-[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=514548974]
-position = Vector2(0, -22)
-scale = Vector2(0.34, 0.34)
-sprite_frames = SubResource("SpriteFrames_3f5lc")
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=2035504585]
+position = Vector2(0, -21)
+sprite_frames = SubResource("SpriteFrames_37git")
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=161101283]
 position = Vector2(0, -32)
