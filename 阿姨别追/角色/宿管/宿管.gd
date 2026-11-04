@@ -67,6 +67,7 @@ func _ready() -> void:
 	# 门靠这个认出「推门的是宿管」，然后去清单里取宿管那一行的时长。
 	# 这一句只说明「我是谁」，不说明「我多快」—— 多快是场景数据。
 	add_to_group("keeper")
+	$AnimatedSprite2D.play("朝右")   # 出生默认面朝右（贴图两个动画：朝右/朝左）
 	$ClimbZone.area_entered.connect(_on_climb_enter)
 	$ClimbZone.area_exited.connect(_on_climb_exit)
 	Director.register_controllable(self)   # 向总管报到：我可以被玩家控制
@@ -221,10 +222,13 @@ func _开门() -> void:
 # ============================================================
 
 ## 每帧更新朝向：按住方向键的哪边就面朝哪边（没按就维持上一次的）
+## 贴图切两个动画：朝右 / 朝左（百炼生图，黑底已离线抠掉）。
+## 要是主人看出两边反了，把下面两行的「朝右」「朝左」对调即可。
 func _更新朝向() -> void:
 	var d := signf(Input.get_axis("left", "right"))
-	if d != 0.0:
+	if d != 0.0 and d != _swing_dir:
 		_swing_dir = d
+		$AnimatedSprite2D.play("朝右" if d > 0.0 else "朝左")
 
 ## 朝面对方向挥一记扫把：站定、扇形射线扫一遍，打中学生就掉她一格血
 func _挥击() -> void:
@@ -234,12 +238,54 @@ func _挥击() -> void:
 	velocity.x = 0.0
 	_swing_cd_left = SWING_CD
 	_swing_recover_left = SWING_RECOVER
+	闪一下攻击范围()   # 让主人看见这一刀扇形有多大（19:31 要的「看到攻击范围」）
 	var 打中谁 := _扇形找目标()
 	if 打中谁 != null:
 		打中谁.被打中()
 		print("[宿管] 挥击命中：%s（剩 %d/%d 格）" % [打中谁.name, 打中谁.血量, 打中谁.MAX_HP])
 	else:
 		print("[宿管] 挥了个空")
+
+
+## 挥击那一下闪出的范围（跟判定扇形同尺寸：200px × 120°，从胸口张开）
+## 两层一起闪：① 淡金扇形 = 真实判定范围（一眼看出打得到哪）
+##             ② 百炼生成的弧光图（白底已离线抠掉）= 好看的部分
+## 挥完 0.18 秒淡出消失。图是「随便先做一点」的占位，主人看效果再定。
+func 闪一下攻击范围() -> void:
+	var 弧 := SWING_ARC * deg_to_rad(1.0)
+	var 每步 := 弧 / 12.0
+	var 点 := PackedVector2Array()
+	点.append(Vector2.ZERO)
+	for i in range(13):
+		var a := -弧 * 0.5 + 每步 * i
+		点.append(Vector2(_swing_dir, 0.0).rotated(a) * SWING_RANGE)
+
+	# ① 真实判定范围：一层淡金扇形
+	var poly := Polygon2D.new()
+	poly.polygon = 点
+	poly.color = Color(1.0, 0.82, 0.3, 0.30)
+	poly.position = Vector2(0, -26)
+	add_child(poly)
+
+	# ② 弧光图：缩到 400px 宽、胸口居中
+	var spr := Sprite2D.new()
+	spr.texture = 预载特效图
+	var 缩放 := 400.0 / float(spr.texture.get_width())
+	spr.scale = Vector2(缩放, 缩放)
+	spr.position = Vector2(0, -26)
+	spr.modulate = Color(1, 1, 1, 0.95)
+	add_child(spr)
+
+	var tw := create_tween()
+	tw.tween_property(poly, "modulate:a", 0.0, 0.18).set_delay(0.06)
+	tw.tween_property(spr, "modulate:a", 0.0, 0.18).set_delay(0.06)
+	tw.tween_callback(func() -> void:
+		poly.queue_free()
+		spr.queue_free()
+	)
+
+## 特效贴图只载一次（所有挥击共用这张图）
+var 预载特效图: Texture2D = load("res://素材/生图/挥击特效_透明.png")
 
 
 ## 身前 2 米 × 120° 扇形里有没有学生？射线一把（12 条），谁近打谁
