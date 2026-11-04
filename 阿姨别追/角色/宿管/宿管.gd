@@ -88,8 +88,8 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 
-	# ── 开门：E 键。梯子上不开门 ──
-	if Input.is_action_just_pressed("interaction"):
+	# ── 开门：E 键（W2D2 按键分开后，宿管也读 open_door）。梯子上不开门 ──
+	if Input.is_action_just_pressed("open_door"):
 		_开门()
 
 	# ── 重力 ──

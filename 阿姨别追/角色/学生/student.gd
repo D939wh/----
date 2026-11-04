@@ -177,35 +177,40 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()  #挂挡
 
 # ============================================================
-# W1D4 · 搬运与道具
+# W1D4 · 搬运与道具（W2D2 起按 E/F 分键，见下一段）
 # ------------------------------------------------------------
-# 交互键 E 一件事分三步走（先看手上有没有东西）：
-#   1) 正扛着箱子 → 放下
-#   2) 空手 + 附近有箱子 → 扛起来（状态变 CARRYING）
-#   3) 空手 + 附近有道具 → 捡进右下角格子
-# 右键单独管"用道具"：消耗掉、格子变空。今天用掉没有任何效果。
+
+# ============================================================
+# W2D2 · 按键分开（2026-11-04）
+# ------------------------------------------------------------
+# E 和 F 从此各管一件事，不再一个键四件事：
+#   E（open_door）   → 只开门。扛着东西不开门（手上没空）
+#   F（interaction） → 只搬东西：扛着就放下 → 否则找箱子 → 再找道具
+#   Q（use_item）    → 用掉手上的道具（不变）
+# 拆开后两件事互不干扰：抱着箱子路过门，按 F 不会误触门，
+# 对着门按 F 也不会把箱子举起来。
 # ============================================================
 
+# 扛着的箱子跟着人走（轻的抱在胸前，重的拖在脚边）
 func _update_interaction() -> void:
-	# 扛着的箱子跟着人走（轻的抱在胸前，重的拖在脚边）
 	if _carry_state == CarryState.CARRYING and is_instance_valid(_carried):
 		_carried.position = _扛着的位置()
 
+	if Input.is_action_just_pressed("open_door"):
+		_open_door()
+
 	if Input.is_action_just_pressed("interaction"):
-		_interact()
+		_pick_or_drop()
 
 	if Input.is_action_just_pressed("use_item") and _item_icon != null:
 		_use_item()
 
-# E 键：按上面三步走
-func _interact() -> void:
+# E 键：只开门。扛着东西时不开 —— 手上没空（保持拆分前原行为）
+# 我只说一句「我要推这扇门」，说完就走开也行 —— 开多快是门的事（它查 数据/楼层清单.gd）
+# 门开够了自己撤掉挡路的碰撞体，我撞过去就过去了，不需要它回话给我
+func _open_door() -> void:
 	if _carry_state == CarryState.CARRYING:
-		_drop_box()
 		return
-
-	# 门排最前：门挡着路的时候，先处理门 —— 扛着东西时不开门（手上没空）
-	# 我只说一句「我要推这扇门」，说完就走开也行 —— 开多快是门的事（它查 数据/楼层清单.gd）
-	# 门开够了自己撤掉挡路的碰撞体，我撞过去就过去了，不需要它回话给我
 	for area in $PickupZone.get_overlapping_areas():
 		if area.is_in_group("door"):
 			var door: Node = area.get_parent()
@@ -213,7 +218,15 @@ func _interact() -> void:
 				door.press(self)
 			return
 
-	# 感应区里现在有哪些东西？先找可搬运的，再找可使用的
+# F 键：只管搬。手上有没有货决定干哪件事：
+#   1) 正扛着箱子 → 放下
+#   2) 空手 + 附近有箱子 → 扛起来（状态变 CARRYING）
+#   3) 空手 + 附近有道具 → 捡进右下角格子
+func _pick_or_drop() -> void:
+	if _carry_state == CarryState.CARRYING:
+		_drop_box()
+		return
+
 	for area in $PickupZone.get_overlapping_areas():
 		if area.is_in_group("carryable"):
 			_pick_up_box(area)
