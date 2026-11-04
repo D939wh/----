@@ -5,7 +5,7 @@
              （看现有：--ai-note-show "项目名"；恢复默认：--ai-note-reset "项目名"） -->
 
 【项目】阿姨别追
-路径：D:\dugaogaogao\阿姨别追
+路径：D:\Github\阿姨别追
 程序：D:\Git\文档中心\文档中心.exe（文档中心.exe，改须知/简报都通过它）
 
 给 AI 的话：
