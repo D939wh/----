@@ -107,8 +107,12 @@ func _physics_process(delta: float) -> void:
 	if 被扛着:
 		return
 	if 瘫痪:
-		# 瘫了不动：不吃输入、不能交互，但物理上还是实体（宿管能碰到我）。
-		velocity = Vector2.ZERO
+		# 瘫了：不吃输入、不能交互，但重力照常——被放下/被搬到空中会自己落到地上
+		velocity.x = 0.0
+		if not is_on_floor():
+			velocity.y += GRAVITY * delta
+		else:
+			velocity.y = 0.0
 		move_and_slide()
 		return
 

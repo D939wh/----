@@ -52,15 +52,15 @@ func _ready() -> void:
 	Input.action_release("right")
 	r["瘫了走不动"] = "宿管位移 %.0f（后摇中应为 0）" % (k.global_position.x - 900.0)
 
-	# —— CD 过去，贴身（20px）按住 F 读条 1.2 秒 → 扛上肩 ——
+	# —— CD 过去，贴身（20px）按住 G 读条 1.2 秒 → 扛上肩 ——
 	await _wait(1.0)
 	k.global_position = Vector2(940, 208)
 	await _wait(0.1)
-	Input.action_press("interaction")
+	Input.action_press("grab")
 	await _wait(1.4)
 	r["读完条"] = "宿管扛着人=%s / 学生被扛=%s / 学生父节点=%s" % [
 		k._carried_student != null, s.被扛着, s.get_parent().name]
-	Input.action_release("interaction")
+	Input.action_release("grab")
 
 	# —— 扛着人走：移速应 370×0.6=222，0.5 秒走约 100+px ——
 	var before := k.global_position.x
@@ -70,24 +70,43 @@ func _ready() -> void:
 	r["扛人走"] = "0.5 秒位移 %.0f（222 速应 100+）" % (k.global_position.x - before)
 	r["学生跟身"] = "间距 %.0f（<40 算跟上）" % abs(s.global_position.x - k.global_position.x)
 
-	# —— 再按 F：放下，学生还瘫着、回到场景名下 ——
+	# —— 再按 G：放下。学生该落在宿管脚边地面上（不能消失/弹飞）——
 	await _wait(0.3)
-	await _tap_f()
-	await _wait(0.3)
+	await _tap_g()
+	await _wait(0.4)
 	r["放下后"] = "宿管空肩=%s / 学生不被扛=%s / 还瘫痪=%s / 父节点=%s" % [
 		k._carried_student == null, s.被扛着 == false, s.瘫痪, s.get_parent().name]
+	r["放下位置"] = "学生在 (%.0f, %.0f)，宿管在 (%.0f, %.0f)（脚边±26px、同一地面为对）" % [
+		s.global_position.x, s.global_position.y, k.global_position.x, k.global_position.y]
+	var 在脚边: bool = abs(s.global_position.x - k.global_position.x) <= 40.0
+	var 在地面: bool = absf(s.global_position.y - k.global_position.y) < 8.0
+	r["放下判in"] = "在脚边=%s / 在地面=%s" % [在脚边, 在地面]
 
-	# —— 打断验证：再按住 F 读条，读到一半走开 → 进度清零、扛不成 ——
+	# —— 打断验证：再按住 G 读条，读到一半走开 → 进度清零、扛不成 ——
 	await _wait(1.3)   # 等挥击 CD 过去
 	k.global_position = Vector2(940, 208)
 	await _wait(0.1)
-	Input.action_press("interaction")
+	Input.action_press("grab")
 	await _wait(0.6)                       # 读到一半（0.6 < 1.2）
 	k.global_position = Vector2(1140, 208)  # 宿管瞬移走开（超 60px 判定线）
 	await _wait(0.3)
-	Input.action_release("interaction")
+	Input.action_release("grab")
 	r["打断验证"] = "读条进度 %.2f（应清零为 0）/ 扛着人=%s（应 false）" % [
 		k._grab_progress, k._carried_student != null]
+
+	# —— 朝向验证：宿管先向左走（面朝左），学生对齐到她左侧，按 F 应朝左命中 ——
+	await _wait(1.3)   # 等挥击 CD
+	s.拉起()           # 学生恢复，重摆位置再打
+	await get_tree().physics_frame
+	Input.action_press("left")
+	await _wait(0.3)
+	Input.action_release("left")
+	await _wait(0.2)
+	k.global_position = Vector2(940, 208)
+	s.global_position = Vector2(880, 208)   # 学生在宿管左边 60px
+	await _wait(0.1)
+	await _tap_f()
+	r["朝左挥"] = "宿管朝向 %.0f（应 -1）/ 学生血量 %d（应 1）" % [k._swing_dir, s.血量]
 
 	# —— 恢复现场：控制权还给学生，血量拉起 ——
 	Director.switch_control()
@@ -109,4 +128,13 @@ func _tap_f() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	Input.action_release("interaction")
+	await _wait(0.15)
+
+
+## 模拟「按一下 G」：press → 两个物理帧 → release → 稳定 0.15 秒
+func _tap_g() -> void:
+	Input.action_press("grab")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	Input.action_release("grab")
 	await _wait(0.15)

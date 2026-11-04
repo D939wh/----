@@ -48,7 +48,7 @@ const CARRY_SPEED_MULT: float = 0.6     # 扛人时移速乘它（策划案 −4
 
 var _swing_cd_left: float = 0.0         # 挥击冷却还剩几秒
 var _swing_recover_left: float = 0.0    # 后摇还剩几秒（>0 时不能动）
-var _swing_dir: float = 0.0             # 挥击那一下朝向（1 右 / -1 左）
+var _swing_dir: float = 1.0             # 面朝哪边（1 右 / -1 左）。出生默认朝右，之后随方向键更新
 var _grabbing: bool = false             # 正在长按读条抓人？
 var _grab_target: Node = null           # 读条目标是哪个学生
 var _grab_progress: float = 0.0         # 读条进度（0~1）
@@ -117,25 +117,24 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("open_door"):
 		_开门()
 
-	# ── W2D2 · F 键一件事分三路（按下的那一刻就定好走哪路）──
-	#   ① 肩上扛着学生 → 放下
-	#   ② 贴身（40px 内）有瘫痪学生 → 开始抓捕读条（按住 1.2 秒扛上肩）
-	#   ③ 都没有 → 挥击（朝向身前 2 米扇形，打中掉学生 1 格血）
-	# 挥击和抓捕不会同时发生：读条要求目标已经瘫痪，挥击打的是活人。
+	# ── W2D2 · 键位各管一件事（18:51 主人验收定的：攻击/搬运分开）──
+	#   F（interaction）→ 只挥击（攻击）
+	#   G（grab）       → 只扛人：扛着就放下；贴身有瘫痪学生就按住读条扛上肩
+	_更新朝向()
 	if Input.is_action_just_pressed("interaction"):
+		_挥击()
+	if Input.is_action_just_pressed("grab"):
 		if _carried_student != null:
 			_放下学生()
 		elif _贴身瘫痪学生() != null:
 			_grabbing = true
 			_grab_target = _贴身瘫痪学生()
 			_grab_progress = 0.0
-			print("[宿管] 开始抓捕读条（按住别松）")
-		else:
-			_挥击()
+			print("[宿管] 开始抓捕读条（按住 G 别松）")
 
-	# ── W2D2 · 读条推进：按住 F 且目标还在贴身范围内，1.2 秒满 → 扛上肩 ──
+	# ── 读条推进：按住 G 且目标还在贴身范围内，1.2 秒满 → 扛上肩 ──
 	if _grabbing:
-		if not Input.is_action_pressed("interaction") or _grab_target == null \
+		if not Input.is_action_pressed("grab") or _grab_target == null \
 				or not is_instance_valid(_grab_target) \
 				or global_position.distance_to(_grab_target.global_position) > GRAB_RANGE * 1.5:
 			print("[宿管] 抓捕被打断，进度清零")
@@ -217,7 +216,15 @@ func _开门() -> void:
 # 策划案数字全在顶部常量里：2 米 × 120° / 后摇 0.8 秒 / CD 1.2 秒 /
 # 抓捕读条 1.2 秒 / 扛人移速 −40%。
 # 素材后面有：挥击那一下暂不播动画，学生被打中的「变红半透明」就是命中反馈。
+# 朝向（18:51 主人定）：宿管**持续**记住自己面朝哪边——移动时更新，
+# 挥击/扛人位置都跟着朝向走。以后做动画（左挥/右挥两套帧）直接读 _swing_dir。
 # ============================================================
+
+## 每帧更新朝向：按住方向键的哪边就面朝哪边（没按就维持上一次的）
+func _更新朝向() -> void:
+	var d := signf(Input.get_axis("left", "right"))
+	if d != 0.0:
+		_swing_dir = d
 
 ## 朝面对方向挥一记扫把：站定、扇形射线扫一遍，打中学生就掉她一格血
 func _挥击() -> void:
@@ -225,9 +232,6 @@ func _挥击() -> void:
 		return   # 还在冷却，挥不出来
 	# 站定才能挥：挥的那一下速度清零，后摇里也走不动（见上面移速段）
 	velocity.x = 0.0
-	_swing_dir = signf(Input.get_axis("left", "right"))
-	if _swing_dir == 0.0:
-		_swing_dir = 1.0   # 没按方向就默认朝右挥
 	_swing_cd_left = SWING_CD
 	_swing_recover_left = SWING_RECOVER
 	var 打中谁 := _扇形找目标()
@@ -285,9 +289,13 @@ func _扛起(学生: Node) -> void:
 	print("[宿管] 抓捕完成，%s 扛上肩（移速 %.0f）" % [学生.name, SPEED * CARRY_SPEED_MULT])
 
 
-## 肩上的学生放下来：交还给场景、瘫着趴地上。学生自己 reparent 回去
+## 肩上的学生放下来：摆到脚边地面上（按朝向），瘫着趴地上。
+## 为什么摆脚边不摆胸口：碰撞体一恢复，重叠的身体会被物理弹开——
+## 主人 18:51 验收看到的「人消失了」就是这个：学生被弹飞出画面（地图还没封边）。
 func _放下学生() -> void:
 	var 学生 := _carried_student
 	_carried_student = null
 	学生.被放下(get_parent())
+	# 学生的原点在脚底（碰撞体从 -44 到 0），摆到宿管脚边、贴地面，正好不重叠
+	学生.global_position = global_position + Vector2(_swing_dir * 26.0, 0.0)
 	print("[宿管] 放下了 %s" % 学生.name)
