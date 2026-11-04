@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://c1testkeeper1"]
+
+[ext_resource type="Script" path="res://场景/测试/阿姨打人自测.gd" id="1_selftest"]
+
+[node name="阿姨打人自测" type="Node"]
+script = ExtResource("1_selftest")

@@ -31,6 +31,29 @@ const HANG_VY_BAND: float = 40.0
 const CLIMB_SPEED: float = 70.0
 const CLIMB_OFF_JUMP: float = -180.0
 
+# ── 挥击 / 抓捕 / 扛人（W2D2，2026-11-04）────────────────────
+# 策划案原数：挥击身前 2 米 × 120° 扇形、1 格伤害、站定才能挥、
+# 后摇 0.8 秒、CD 1.2 秒；抓捕贴身长按 1.2 秒读条，被打断则重置。
+# 学生拎人移速 −40% 不变（370 × 0.6 = 222）、不能爬梯。
+# 素材后面有，挥击动画先用现有帧占位（打中那一下学生变红半透明）。
+const SWING_RANGE: float = 200.0        # 挥击距离（像素）。2 米 × 100 像素/米
+const SWING_ARC: float = 120.0          # 扇形角度（度）
+const SWING_RAYS: int = 12              # 扇形里打几条射线（越多越密，12 条足够）
+const SWING_RECOVER: float = 0.8        # 后摇：挥完这秒内不能再挥、不能动
+const SWING_CD: float = 1.2             # 冷却：从挥出起算，隔这秒才能再挥
+const GRAB_TIME: float = 1.2            # 抓捕读条总时长（秒）
+const GRAB_RANGE: float = 40.0          # 多近算「贴身」（像素）
+const CARRY_STUDENT_OFFSET := Vector2(14, -34)  # 学生扛在肩上的相对位置
+const CARRY_SPEED_MULT: float = 0.6     # 扛人时移速乘它（策划案 −40%）
+
+var _swing_cd_left: float = 0.0         # 挥击冷却还剩几秒
+var _swing_recover_left: float = 0.0    # 后摇还剩几秒（>0 时不能动）
+var _swing_dir: float = 0.0             # 挥击那一下朝向（1 右 / -1 左）
+var _grabbing: bool = false             # 正在长按读条抓人？
+var _grab_target: Node = null           # 读条目标是哪个学生
+var _grab_progress: float = 0.0         # 读条进度（0~1）
+var _carried_student: Node = null       # 正扛着哪个学生（null = 空肩）
+
 var _on_ladder: bool = false
 var _climbing: bool = false
 
@@ -75,9 +98,11 @@ func _physics_process(delta: float) -> void:
 	var dir := Input.get_axis("left", "right")
 	var updown := Input.get_axis("up", "down")
 
-	# ── 爬梯：碰到梯子 + 按了上下才算挂住 ──
-	if _on_ladder and updown != 0.0:
+	# ── 爬梯：碰到梯子 + 按了上下才算挂住。扛着人挂不住（策划案：拎人不能爬）──
+	if _on_ladder and updown != 0.0 and _carried_student == null:
 		_climbing = true
+	if _carried_student != null:
+		_climbing = false
 	if _on_ladder and _climbing:
 		velocity.y = updown * CLIMB_SPEED
 		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
@@ -91,6 +116,39 @@ func _physics_process(delta: float) -> void:
 	# ── 开门：E 键（W2D2 按键分开后，宿管也读 open_door）。梯子上不开门 ──
 	if Input.is_action_just_pressed("open_door"):
 		_开门()
+
+	# ── W2D2 · F 键一件事分三路（按下的那一刻就定好走哪路）──
+	#   ① 肩上扛着学生 → 放下
+	#   ② 贴身（40px 内）有瘫痪学生 → 开始抓捕读条（按住 1.2 秒扛上肩）
+	#   ③ 都没有 → 挥击（朝向身前 2 米扇形，打中掉学生 1 格血）
+	# 挥击和抓捕不会同时发生：读条要求目标已经瘫痪，挥击打的是活人。
+	if Input.is_action_just_pressed("interaction"):
+		if _carried_student != null:
+			_放下学生()
+		elif _贴身瘫痪学生() != null:
+			_grabbing = true
+			_grab_target = _贴身瘫痪学生()
+			_grab_progress = 0.0
+			print("[宿管] 开始抓捕读条（按住别松）")
+		else:
+			_挥击()
+
+	# ── W2D2 · 读条推进：按住 F 且目标还在贴身范围内，1.2 秒满 → 扛上肩 ──
+	if _grabbing:
+		if not Input.is_action_pressed("interaction") or _grab_target == null \
+				or not is_instance_valid(_grab_target) \
+				or global_position.distance_to(_grab_target.global_position) > GRAB_RANGE * 1.5:
+			print("[宿管] 抓捕被打断，进度清零")
+			_grabbing = false
+			_grab_target = null
+			_grab_progress = 0.0
+		else:
+			_grab_progress += delta / GRAB_TIME
+			if _grab_progress >= 1.0:
+				_扛起(_grab_target)
+				_grabbing = false
+				_grab_target = null
+				_grab_progress = 0.0
 
 	# ── 重力 ──
 	if not is_on_floor():
@@ -120,12 +178,24 @@ func _physics_process(delta: float) -> void:
 		velocity.y *= JUMP_CUT
 
 	# ── 左右速度 ──
-	if dir != 0.0:
+	# 三个状态影响移速：后摇站定（挥完那 0.8 秒）、扛人 ×0.6（策划案 −40%）、读条时站定
+	var 走速 := SPEED
+	if _carried_student != null:
+		走速 = SPEED * CARRY_SPEED_MULT
+	if dir != 0.0 and _swing_recover_left <= 0.0 and not _grabbing:
 		var same_dir := signf(velocity.x) == signf(dir)
-		if not (not is_on_floor() and same_dir and absf(velocity.x) > SPEED):
-			velocity.x = move_toward(velocity.x, dir * SPEED, ACCEL * delta)
+		if not (not is_on_floor() and same_dir and absf(velocity.x) > 走速):
+			velocity.x = move_toward(velocity.x, dir * 走速, ACCEL * delta)
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
+
+	# ── 挥击冷却/后摇计时（每帧减一点）──
+	_swing_cd_left = maxf(_swing_cd_left - delta, 0.0)
+	_swing_recover_left = maxf(_swing_recover_left - delta, 0.0)
+
+	# 扛着学生时，把他摆到肩上（位置每帧算，跟学生搬箱子同一个套路）
+	if _carried_student != null and is_instance_valid(_carried_student):
+		_carried_student.global_position = global_position + Vector2(_swing_dir * CARRY_STUDENT_OFFSET.x, CARRY_STUDENT_OFFSET.y)
 
 	move_and_slide()
 
@@ -139,3 +209,85 @@ func _开门() -> void:
 			if door != null and door.has_method("press"):
 				door.press(self)   # 说完这一句就没我的事了，门自己慢慢开
 			return
+
+
+# ============================================================
+# W2D2 · 挥击 / 抓捕 / 扛人（阿姨打人那件事的宿管侧）
+# ------------------------------------------------------------
+# 策划案数字全在顶部常量里：2 米 × 120° / 后摇 0.8 秒 / CD 1.2 秒 /
+# 抓捕读条 1.2 秒 / 扛人移速 −40%。
+# 素材后面有：挥击那一下暂不播动画，学生被打中的「变红半透明」就是命中反馈。
+# ============================================================
+
+## 朝面对方向挥一记扫把：站定、扇形射线扫一遍，打中学生就掉她一格血
+func _挥击() -> void:
+	if _swing_cd_left > 0.0:
+		return   # 还在冷却，挥不出来
+	# 站定才能挥：挥的那一下速度清零，后摇里也走不动（见上面移速段）
+	velocity.x = 0.0
+	_swing_dir = signf(Input.get_axis("left", "right"))
+	if _swing_dir == 0.0:
+		_swing_dir = 1.0   # 没按方向就默认朝右挥
+	_swing_cd_left = SWING_CD
+	_swing_recover_left = SWING_RECOVER
+	var 打中谁 := _扇形找目标()
+	if 打中谁 != null:
+		打中谁.被打中()
+		print("[宿管] 挥击命中：%s（剩 %d/%d 格）" % [打中谁.name, 打中谁.血量, 打中谁.MAX_HP])
+	else:
+		print("[宿管] 挥了个空")
+
+
+## 身前 2 米 × 120° 扇形里有没有学生？射线一把（12 条），谁近打谁
+## 两个坑（无头诊断出来的）：
+##   ① 射线起点若在自己脚底，会先撞进宿管自己的碰撞体——整条射线被自己吞掉
+##   ② 学生的 ClimbZone/PickupZone 感应区比身体大，先撞进去射线就停在感应区上
+## 对策：起点抬到胸口（出自己身体）+ exclude 自己 + 只认身体不认感应区
+func _扇形找目标() -> Node:
+	var 命中: Node = null
+	var 最近距离 := SWING_RANGE
+	var half_arc := deg_to_rad(SWING_ARC) * 0.5
+	var 每步角度 := deg_to_rad(SWING_ARC / SWING_RAYS)   # 一条射线管几度
+	var 起点 := global_position + Vector2(0, -26)        # 胸口：既出自己身位，也够得着学生的身体
+	for i in range(SWING_RAYS):
+		var 角 := -half_arc + 每步角度 * i
+		var 朝向 := Vector2(_swing_dir, 0.0).rotated(角)
+		var 查询 := PhysicsRayQueryParameters2D.create(
+			起点, 起点 + 朝向 * SWING_RANGE)
+		查询.collide_with_areas = false
+		查询.collide_with_bodies = true
+		查询.exclude = [self]
+		var 结果 := get_world_2d().direct_space_state.intersect_ray(查询)
+		if not 结果.is_empty():
+			var 目标: Node = 结果["collider"]
+			# 打的是学生（CharacterBody2D 且有「被打中」这个接口），不是箱子不是门
+			if 目标 != self and 目标.has_method("被打中"):
+				if 结果["position"].distance_to(起点) < 最近距离:
+					最近距离 = 结果["position"].distance_to(起点)
+					命中 = 目标
+	return 命中
+
+
+## 贴身 40px 内有没有瘫痪的学生？抓捕读条的对象从这里来
+func _贴身瘫痪学生() -> Node:
+	for body in $PickupZone.get_overlapping_bodies():
+		if body != self and body.has_method("被打中") and body.瘫痪:
+			return body
+	return null
+
+
+## 读条满了：把学生扛上肩。单向接口，学生那边自己 reparent + 清速度
+func _扛起(学生: Node) -> void:
+	_carried_student = 学生
+	学生.被扛起(self)
+	# 扛人不能爬梯（策划案）；肩上有人时梯子挂不住
+	_climbing = false
+	print("[宿管] 抓捕完成，%s 扛上肩（移速 %.0f）" % [学生.name, SPEED * CARRY_SPEED_MULT])
+
+
+## 肩上的学生放下来：交还给场景、瘫着趴地上。学生自己 reparent 回去
+func _放下学生() -> void:
+	var 学生 := _carried_student
+	_carried_student = null
+	学生.被放下(get_parent())
+	print("[宿管] 放下了 %s" % 学生.name)
