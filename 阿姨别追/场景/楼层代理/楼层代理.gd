@@ -38,10 +38,58 @@ func _seed_doors() -> void:
 ## 总管把话递到这里。以后「灯要亮」「柜子要弹开」也走这一个口
 func on_report(event: String, data: Dictionary) -> void:
 	match event:
+		"interact":
+			_处理交互(data)
 		"door_pressed":
 			print("[代理·%s] 收到：%s 被按了" % [floor_id, data.get("door_id", "?")])
 		_:
 			print("[代理·%s] 收到不认识的事：%s" % [floor_id, event])
+
+
+## 角色只说了「我在这一层碰了东西，按的是这个键」，剩下全靠这里认。
+## 这就是三层架构真正落地的那一段：判定权在代理手里，不在角色手里。
+##
+## 【为什么判定要放在这一层】
+##   1. 学生不认识门、不认识箱子 —— 加十种新家具，学生脚本一个字不改；
+##   2. 只有这一层知道「这一层都有什么」（_doors 就是它建的）；
+##   3. 以后要加「开着门的时候不许搬箱子」这种场景规矩，也只有这里改得动。
+func _处理交互(data: Dictionary) -> void:
+	var 谁: Node = data.get("谁", null)
+	var 键: String = data.get("键", "")
+	var 碰到: Array = data.get("碰到", [])
+	print("[代理·%s] 收到：interact" % floor_id)
+
+	if 谁 == null:
+		return   # 没说是谁碰的，没人能动手。不报错：宁可什么都不做，也别乱开门
+
+	if 键 == "open_door":
+		# 门的分身（Area2D「Zone」）在 door 组里，门本体是它的父节点
+		for area in 碰到:
+			if area.is_in_group("door"):
+				var door: Node = area.get_parent()
+				if door != null and door.has_method("press"):
+					print("[代理·%s] 判定：是门 → 交给门自己开" % floor_id)
+					door.press(谁)
+				return
+		return
+
+	if 键 == "interaction":
+		# 顺序不能改：先箱子，再道具。这是拆分 E/F 之前就定下的行为
+		# （箱子是大事、道具是小事；站在两件东西中间时先搬箱子）
+		for area in 碰到:
+			if area.is_in_group("carryable"):
+				print("[代理·%s] 判定：是可搬运物 → 让%s扛起" % [floor_id, 谁.name])
+				谁.扛起(area)
+				return
+		for area in 碰到:
+			if area.is_in_group("usable_item"):
+				if 谁.收起道具(area):
+					print("[代理·%s] 判定：是道具 → %s 收进了道具格" % [floor_id, 谁.name])
+				return
+		return
+
+	# 一样都没找到：正常。玩家对着空气按键就是会发生的事，不是故障
+
 
 
 ## 给外部查询：这一层的某扇门

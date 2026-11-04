@@ -176,15 +176,25 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 
+## 我碰到了东西，但不知道那是什么，也轮不到我猜。
+## 写法和学生那份一模一样：把「感应区里有哪些东西」原样交给总管，由楼层代理认。
+## 【2026-11-04 修架构】以前这里自己遍历感应区、看组名、直接调门的 press 接口，
+## 和策划案 §7.6.2 第 2 条对着干（角色不该知道门在哪）。现在只上报，不判断。
+func _上报交互(键: String) -> void:
+	Director.report(
+		# 多层时 floor_of() 会返回空字符串（已知技术债，做二楼时再修），
+		# 现在只有一层，返回的就是"一楼"。
+		Director.floor_of(self),
+		"interact",
+		{ "谁": self, "键": 键, "碰到": $PickupZone.get_overlapping_areas() }
+	)
+
+
 ## E 键只做一件事：开/关面前那扇门。她捡不了东西，也搬不了箱子
 ## 注意：这里没有「宿管开门 1.5 秒」这种数字。她只是递申请，快慢由门照清单决定。
+## 「面前有没有门」也不由她判断 —— 她只上报"我按了开门键"，代理去认。
 func _开门() -> void:
-	for area in $PickupZone.get_overlapping_areas():
-		if area.is_in_group("door"):
-			var door: Node = area.get_parent()
-			if door != null and door.has_method("press"):
-				door.press(self)   # 说完这一句就没我的事了，门自己慢慢开
-			return
+	_上报交互("open_door")
 
 
 # ============================================================

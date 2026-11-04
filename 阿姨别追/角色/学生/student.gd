@@ -237,40 +237,55 @@ func _update_interaction() -> void:
 	if Input.is_action_just_pressed("use_item") and _item_icon != null:
 		_use_item()
 
+# ============================================================
+# 【2026-11-04 修架构】我碰了东西，但我不猜那是什么
+# ------------------------------------------------------------
+# 以前这里写的是「遍历感应区 → 看它在不在 door/carryable 组 → 直接调它的方法」。
+# 策划案 §7.6.2 第 2 条点名禁止这种写法，因为它让角色知道了门在哪、箱子长什么样：
+#   以后加快递柜、加电闸箱，这个文件就得跟着改一次；
+#   以后开第二层楼，同一个文件还要再判断"这是哪层的东西"。
+#
+# 现在改成：我只把「我身边碰到了哪些东西」原样交出去，一个字都不判断。
+# 谁认、谁动手，是楼层代理的事。
+#   我 ──"我碰到东西了"+一堆东西──▶ 总管 ──▶ 这一层的代理 ──▶ 门自己开/箱子被扛起
+# 从此我的脚本里既没有组名，也没有门的接口；加一百种新家具，我一个字不用改。
+# ============================================================
+
+## 我碰到了东西，但不知道那是什么，也轮不到我猜。
+## 我把「感应区里有哪些东西」原样交给总管，由楼层代理认。
+## 注意：只在按键那一刻上报。_ready 里不能报 —— 那时楼层代理还没登记好，
+## 报上去会因为"没这一层"被退回（实测过的坑）。
+func _上报交互(键: String) -> void:
+	Director.report(
+		# 多层时 floor_of() 会返回空字符串（已知技术债，做二楼时再修），
+		# 现在只有一层，返回的就是"一楼"。
+		Director.floor_of(self),
+		"interact",
+		{ "谁": self, "键": 键, "碰到": $PickupZone.get_overlapping_areas() }
+	)
+
 # E 键：只开门。扛着东西时不开 —— 手上没空（保持拆分前原行为）
-# 我只说一句「我要推这扇门」，说完就走开也行 —— 开多快是门的事（它查 数据/楼层清单.gd）
-# 门开够了自己撤掉挡路的碰撞体，我撞过去就过去了，不需要它回话给我
+# 「扛着东西」是我自己的状态，只有我知道，所以这一句我自己判断；
+# 至于"前面到底有没有门"，我不看，交给代理。
 func _open_door() -> void:
 	if _carry_state == CarryState.CARRYING:
 		return
-	for area in $PickupZone.get_overlapping_areas():
-		if area.is_in_group("door"):
-			var door: Node = area.get_parent()
-			if door != null and door.has_method("press"):
-				door.press(self)
-			return
+	_上报交互("open_door")
 
 # F 键：只管搬。手上有没有货决定干哪件事：
-#   1) 正扛着箱子 → 放下
-#   2) 空手 + 附近有箱子 → 扛起来（状态变 CARRYING）
-#   3) 空手 + 附近有道具 → 捡进右下角格子
+#   1) 正扛着箱子 → 放下（纯自己的状态 + 换父节点，不涉及"我碰到了什么"）
+#   2) 空手 → 把身边的东西报上去，是箱子还是道具由代理认
 func _pick_or_drop() -> void:
 	if _carry_state == CarryState.CARRYING:
 		_drop_box()
 		return
-
-	for area in $PickupZone.get_overlapping_areas():
-		if area.is_in_group("carryable"):
-			_pick_up_box(area)
-			return
-	for area in $PickupZone.get_overlapping_areas():
-		if area.is_in_group("usable_item") and _item_icon == null:
-			_pick_up_item(area)
-			return
+	_上报交互("interaction")
 
 # 扛起箱子：变成箱子的父节点，位置摆在身前（超重的拖在地上）
 # 从这一行开始，人就被它的重量拖住了 —— 具体罚多少问 `数据/重量档位.gd`
-func _pick_up_box(box: Area2D) -> void:
+# 【谁调它】楼层代理：代理认出"这是 carryable"之后才喊这一句。
+# 学生自己不再调用它，所以从私有（_开头）改成公开。
+func 扛起(box: Area2D) -> void:
 	_carried = box
 	_carry_state = CarryState.CARRYING
 	_应用负重(box.取重量() if box.has_method("取重量") else 0.0)
@@ -320,7 +335,13 @@ func 负重说明() -> String:
 	]
 
 # 捡道具：图记进道具格，地上的物件消失
-func _pick_up_item(item: Area2D) -> void:
+# 【谁调它】楼层代理：代理认出"这是 usable_item"之后才喊这一句。
+# 返回 true = 收下了；false = 没手拿（身上已经有一个了）或者这东西没图。
+# 为什么"收不下"不报错：玩家对着一个已经拿过道具的人再按一次 F 是很正常的操作，
+# 不是故障。让代理拿到 false，以后想加"手上满了"的提示音就有地方接了。
+func 收起道具(item: Area2D) -> bool:
+	if _item_icon != null:
+		return false   # 身上已经有一个了，一格只能放一个
 	# 从物件身上找 Sprite2D 取图（不写死子节点名，换个叫法也不会崩）
 	var spr := item.get_node_or_null("Sprite2D")
 	if spr == null:
@@ -329,10 +350,11 @@ func _pick_up_item(item: Area2D) -> void:
 				spr = child
 				break
 	if spr == null:
-		return   # 没图就不收，免得收个空道具
+		return false   # 没图就不收，免得收个空道具
 	_item_icon = spr.texture
 	item.queue_free()                  # 真消耗：地上的东西没了
 	_refresh_item_slot()
+	return true
 
 # 用道具：今天没有任何效果，只负责消耗掉
 func _use_item() -> void:

@@ -37,13 +37,21 @@ func get_floor(floor_id: String) -> Node:
 
 
 ## 上报一件事。event 是事情的名字，data 是附带的数据
-## 例：Director.report("一楼", "door_pressed", {"door_id": "1-走廊东", "by": self})
-func report(floor_id: String, event: String, data: Dictionary = {}) -> void:
+## 例：Director.report("一楼", "interact", {"谁": self, "键": "open_door", "碰到": [...]})
+##
+## 【为什么要有返回值】（2026-11-04 加）
+##   这个函数现在会回答一句「递到了没有」：true = 这一层登记过、话已经交给代理；
+##   false = 压根没这一层，话递不出去。
+##   角色不需要靠这个返回值做判断（它报完就不管了，现在也确实是忽略返回值的），
+##   但「递没递到」必须能问得出来——不然出了 bug 只能靠猜。
+##   以后要加提示音、要在联机里做「这层没人」的兜底，都从这里接。
+func report(floor_id: String, event: String, data: Dictionary = {}) -> bool:
 	var agent: Node = _floors.get(floor_id, null)
 	if agent == null:
 		push_warning("[总管] 没登记过这一层，话递不到：" + floor_id)
-		return
+		return false
 	agent.on_report(event, data)
+	return true
 
 
 ## 给学生之类的角色用：我在哪个楼层？
