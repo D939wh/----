@@ -10,9 +10,13 @@ extends Node
 ## 学生只管喊「我碰了东西」，由总管去找该负责的那一层。
 
 ## 门被按了。floor_id=哪层，door_id=哪扇，by=谁按的
+## 这个信号本文件自己不 emit，是留给门（以后的灯、柜子）向全工程喊话的。
+## 所以加下面那行，告诉编辑器「它没人用是正常的，别报红黄」。
+@warning_ignore("unused_signal")
 signal door_pressed(floor_id: String, door_id: String, by: Node)
 
 ## 门开完了或关完了。is_open=true 表示现在敞开着
+@warning_ignore("unused_signal")
 signal door_finished(floor_id: String, door_id: String, is_open: bool)
 
 ## 楼层号 -> 代理节点
@@ -108,9 +112,9 @@ func switch_control() -> void:
 ## 把镜头交给它。每个角色自带一个相机，同一时刻只开一个
 func _相机交给(who: Node) -> void:
 	for one in _controllables:
-		var cam := one.get_node_or_null("Camera2D")
-		if cam != null:
-			cam.enabled = (one == who)
+		var 镜头 := one.get_node_or_null("Camera2D")
+		if 镜头 != null:
+			镜头.enabled = (one == who)
 	if who == null:
 		return
 	var cam := who.get_node_or_null("Camera2D")
