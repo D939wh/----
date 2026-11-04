@@ -18,8 +18,6 @@ extends Node2D
 ## 兜底用时：门被单独摆出来、没经过楼层代理的时候用这份
 const 兜底用时 := { "求生者": 0.3, "宿管": 1.5 }
 
-const DOOR_HEIGHT := 96.0       # 门板高度（像素），比这个高就往上挪
-
 var floor_id: String = ""
 var door_id: String = ""
 
@@ -87,10 +85,11 @@ func _is_keeper(who: Node) -> bool:
 	return who != null and who.is_in_group("keeper")
 
 
-## 把 _amount 这个数字变成看得见的样子
+## 把「开到哪儿」变成看得见的样子（2026-11-04 主人改规则）
+## 不再要「往上缩进墙里」的动画：门就是干脆的两态——
+##   关着 = 实体（看得见、挡路）；开着 = 隐藏（看不见、过得去）
 func _apply() -> void:
-	_panel.position.y = -_amount * DOOR_HEIGHT      # 门板往上缩进墙里
-	_panel.modulate.a = 1.0 - _amount * 0.55        # 开得越多越淡，一眼看出状态
+	_panel.visible = _amount <= 0.95   # 关着才看得见门板，开够就整块藏掉
 	var want_blocked := _amount <= 0.95
 	if want_blocked != _blocked:
 		_blocked = want_blocked
