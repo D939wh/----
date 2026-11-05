@@ -39,19 +39,25 @@ var _climbing: bool = false  # 这一趟真的按过上下键在爬了吗（没�
 
 # ── W2D2 · 血量与瘫痪（2026-11-04）────────────────────────────
 # 策划案：学生 2 格血；被挥击打中掉 1 格；两格打空 → 瘫痪（蹲地）。
-# 瘫痪的学生：不能动、不能交互，能被宿管按 F 扛起来搬走。
+# 瘫痪的学生：不能动、不能交互，能被宿管按住 G 读条 1.2 秒扛起来搬走。
 # 扛在宿管肩上时：不吃键盘（宿管替我按方向键）、跟着走、位置由宿管定。
 # 素材后面会换，现在「瘫痪」先用 变红+半透明 占位（红得像被打青了一样）。
 const MAX_HP: int = 2                      # 血量上限（格子数，不是小数）
 const 瘫痪变色 := Color(1.0, 0.35, 0.35, 0.6)  # 占位色：红 + 半透明，等美术素材
+const 拉起读条: float = 4.0                 # 拉队友起来要按住多久（策划案 §5：拉起 4s）
+const 自救读条: float = 2.0                 # 自己爬起来的时长（11-05 主人定，单机没人救时的兜底）
 ## 瘫痪时身体换到第 2 层：宿管身体只认第 1 层，跨得过去不会被她绊住；
 ## 但宿管的感应区（mask 11 = 1+2）照样能看见她，好按 G 扛起来。
+## 同学的感应区 mask 也补了 2（从 8 改成 10），所以同学也能看见她、拉她起来。
 const 正常碰撞层: int = 1
 const 瘫痪碰撞层: int = 2
 
 var 血量: int = MAX_HP                     # 现在还剩几格
 var 瘫痪: bool = false                     # 两格打空了？瘫了不能动
 var 被扛着: bool = false                    # 现在正被宿管扛在肩上？
+var _救人目标: Node = null                 # 正被拉着的瘫倒队友（null = 没在拉）
+var _救人进度: float = 0.0                 # 这次按住 H 已经按了多久（秒）
+var _自救进度: float = 0.0                 # 瘫在地上按住 H 自己爬了多久
 
 
 # ── W1D4 搬运与道具 ─────────────────────────────────────────
@@ -117,6 +123,11 @@ func _physics_process(delta: float) -> void:
 			velocity.y += GRAVITY * delta
 		else:
 			velocity.y = 0.0
+		# 只有「玩家现在正在操作我」时才响应 H 自救。
+		# 为什么必须判：同屏有第二个学生时（测试复制出来的、将来的 AI 队友），
+		# 玩家按一下 H，所有躺着的都会自己爬起来 —— 那就不是自救了，是全体起立。
+		if Director.当前控制 == null or Director.当前控制 == self:
+			_推进自救(delta)
 		move_and_slide()
 		return
 
@@ -127,6 +138,18 @@ func _physics_process(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
 		if not is_on_floor():
 			velocity.y += GRAVITY * delta
+		move_and_slide()
+		return
+
+	# ── H：救 ──────────────────────────────────────────────
+	# 站着按 H = 拉身边瘫倒的队友（按住 4 秒）；瘫着按 H = 自己爬（2 秒，在上面的瘫痪分支里）。
+	# 读条期间自己不能动（策划案 §5：拉起期间双方均不可移动）——被拉的那个本来就瘫着动不了。
+	if _推进救人(delta):
+		velocity.x = 0.0
+		if not is_on_floor():
+			velocity.y += GRAVITY * delta
+		else:
+			velocity.y = 0.0
 		move_and_slide()
 		return
 
@@ -377,10 +400,90 @@ func _refresh_item_slot() -> void:
 # 学生不认识宿管，宿管也不给回执 —— 「我瘫了」「我被扛走了」学生自己知道就够了。
 # ============================================================
 
+# ── W2D3 · 救援（2026-11-05）──────────────────────────────────
+# 一个键 H 管两件事，按「我自己是什么状态」分：
+#   站着 → 拉身边瘫倒的队友（4 秒，策划案 §5）
+#   瘫着 → 自己爬起来（2 秒，主人定的兜底：单机没人来救也不能一直躺着）
+#
+# 为什么救援不走楼层代理：代理管的是「场景里的东西」（门、箱子、电闸箱），
+# 而队友是「人」。宿管扛人、挥击也一直是角色直连，这里跟它保持一致。
+# 将来「事件中枢」建好了要统一收编，那时再一起搬。
+# 策划案 §7.6 那条「不许直接伸手去改别人身上的状态」：这里只对自己和自己的读条动手，
+# 被救的那个人由它自己的 拉起() 处理 —— 不是我改它，是它自己站起来。
+# ============================================================
+
+## 身边有没有瘫倒的队友。自己不算，被宿管扛在肩上的也不算（那已经不是「在原地瘫着」）
+func _贴身瘫痪队友() -> Node:
+	for body in $PickupZone.get_overlapping_bodies():
+		if body != self and body.has_method("拉起") and body.瘫痪 and not body.被扛着:
+			return body
+	return null
+
+
+## 站着按住 H 拉队友。返回「我现在正忙着读条」——调用方据此把人钉在原地
+func _推进救人(delta: float) -> bool:
+	# 刚按下：就近找一个瘫倒的队友
+	if _救人目标 == null:
+		if Input.is_action_just_pressed("self_rescue"):
+			_救人目标 = _贴身瘫痪队友()
+			_救人进度 = 0.0
+			if _救人目标 != null:
+				print("[学生] 开始拉 %s（按住 %.0f 秒）" % [_救人目标.name, 拉起读条])
+			else:
+				print("[学生] 身边没有瘫倒的队友")
+		if _救人目标 == null:
+			return false
+
+	# 松手 → 清零重来
+	if not Input.is_action_pressed("self_rescue"):
+		_取消救人()
+		return false
+
+	# 拉着拉着他没了/不瘫了/被扛走了 → 拉不下去
+	if not is_instance_valid(_救人目标) or not _救人目标.瘫痪 or _救人目标.被扛着:
+		print("[学生] 救人中断：目标已经不在原地瘫着了")
+		_取消救人()
+		return false
+
+	_救人进度 += delta
+	# 淡黄 = 正在用力拉（没有 HUD 进度条，这是唯一的肉眼反馈）
+	$AnimatedSprite2D.modulate = Color(1.0, 1.0, 0.75)
+	if _救人进度 >= 拉起读条:
+		var 目标 := _救人目标
+		_取消救人()      # 先清自己的读条，再让对方站起来
+		目标.拉起()
+		print("[学生] 拉起来了：%s" % 目标.name)
+	return true
+
+
+## 清掉这次救援：进度归零、颜色还原。不打印，说哪句话由调用方定
+func _取消救人() -> void:
+	_救人目标 = null
+	_救人进度 = 0.0
+	$AnimatedSprite2D.modulate = Color.WHITE
+
+
+## 瘫痪时按住 H：自己爬起来。颜色从「红」慢慢变白就是读条进度
+func _推进自救(delta: float) -> void:
+	if not Input.is_action_pressed("self_rescue"):
+		_自救进度 = 0.0
+		if not 被扛着:
+			$AnimatedSprite2D.modulate = 瘫痪变色
+		return
+	_自救进度 += delta
+	$AnimatedSprite2D.modulate = 瘫痪变色.lerp(Color.WHITE, minf(_自救进度 / 自救读条, 1.0))
+	if _自救进度 >= 自救读条:
+		_自救进度 = 0.0
+		$AnimatedSprite2D.modulate = Color.WHITE
+		拉起()
+		print("[学生] 自救成功，自己爬起来了")
+
+
 ## 被挥击打中：掉一格血；两格打空 → 瘫痪（蹲地，素材后面换）
 func 被打中() -> void:
 	if 瘫痪 or 被扛着:
 		return   # 已经瘫了就别再打了；扛着的时候打不着
+	_取消救人()   # 正在拉人的时候挨了一下 → 手上的劲散了，读条作废
 	血量 -= 1
 	if 血量 <= 0:
 		_瘫了()

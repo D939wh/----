@@ -52,13 +52,28 @@ func _ready() -> void:
 	Input.action_release("right")
 	r["瘫了走不动"] = "宿管位移 %.0f（后摇中应为 0）" % (k.global_position.x - 900.0)
 
-	# —— CD 过去，贴身（20px）按一下 G → 直接扛上肩（20:01 改成一键，不再读条）——
+	# —— 抓捕读条（11-05 改回策划案 §6 的 1.2 秒）：先试「按一下就松」→ 不该扛起来 ——
 	await _wait(1.0)
 	k.global_position = Vector2(940, 208)
 	await _wait(0.1)
-	await _tap_g()
+	Input.action_press("grab")
+	await _wait(0.4)                 # 只按 0.4 秒，不到 1.2
+	Input.action_release("grab")
 	await _wait(0.2)
-	r["一键扛起"] = "宿管扛着人=%s / 学生被扛=%s / 学生父节点=%s" % [
+	r["读条不足不扛"] = "宿管扛着人=%s（应 false）/ 剩余进度 %.2f（应 0）" % [
+		k._carried_student != null, k._抓捕进度]
+
+	# —— 按住读条期间按着右方向键也不该走（抓人得站定）；1.2 秒后扛上肩 ——
+	var 抓前x := k.global_position.x
+	Input.action_press("grab")
+	Input.action_press("right")
+	await _wait(1.0)                 # 只到 1.0 秒，还在读条里（1.2 才满）
+	Input.action_release("right")    # 先松方向键，免得「扛着走」把位移混进来
+	r["抓人站定"] = "读条中按右的位移 %.0f（应 0）" % (k.global_position.x - 抓前x)
+	await _wait(0.35)                # 剩下 0.2 秒跑满读条
+	Input.action_release("grab")
+	await _wait(0.2)
+	r["按住1.2秒扛起"] = "宿管扛着人=%s / 学生被扛=%s / 学生父节点=%s" % [
 		k._carried_student != null, s.被扛着, s.get_parent().name]
 
 	# —— 扛着人走：移速应 370×0.6=222，0.5 秒走约 100+px ——
@@ -95,6 +110,42 @@ func _ready() -> void:
 	await _wait(0.1)
 	await _tap_f()
 	r["朝左挥"] = "宿管朝向 %.0f（应 -1）/ 学生血量 %d（应 1）" % [k._swing_dir, s.血量]
+
+	# ── W2D3 · 互救：复制一个学生当队友，打瘫它，另一个按住 H 4 秒拉起来 ──
+	# 为什么复制：主场景只有一个学生，互救要两个人。学生本来就是「自我复制」的活物（策划案 §7.6）。
+	s.拉起()
+	s.global_position = Vector2(700, 208)
+	k.global_position = Vector2(1500, 208)   # 宿管挪远，别在救援时捣乱
+	await _wait(0.2)
+
+	var 队友: CharacterBody2D = s.duplicate()
+	scene.add_child(队友)
+	队友.global_position = Vector2(730, 208)   # 感应区 96 宽，30px 稳在里头
+	Director.当前控制 = s                      # 复制品也会向总管报到，把控制权夺回来
+	await _wait(0.2)
+	队友.血量 = 0
+	队友._瘫了()
+	await _wait(0.1)
+	r["互救前"] = "队友瘫痪=%s / 间距 %.0f（感应区 96 宽）" % [
+		队友.瘫痪, abs(队友.global_position.x - s.global_position.x)]
+
+	Input.action_press("self_rescue")
+	await _wait(4.3)                           # 策划案：拉起读条 4 秒
+	Input.action_release("self_rescue")
+	await _wait(0.2)
+	r["互救4秒后"] = "队友还瘫着=%s（应 false）/ 队友血量 %d（应 2）" % [队友.瘫痪, 队友.血量]
+
+	# ── W2D3 · 自救：自己瘫了，按住 H 2 秒爬起来 ──
+	# 队友不删：总管没有注销接口，删了之后换人时会摸到已释放的节点
+	# （11-05 实测崩在 场景总管.gd:123）。留着不影响——它不是「当前控制」，不吃键盘也不挡路。
+	s.血量 = 0
+	s._瘫了()
+	await _wait(0.1)
+	Input.action_press("self_rescue")
+	await _wait(2.3)                           # 主人定的 2 秒
+	Input.action_release("self_rescue")
+	await _wait(0.2)
+	r["自救2秒后"] = "还瘫着=%s（应 false）/ 血量 %d（应 2）" % [s.瘫痪, s.血量]
 
 	# —— 恢复现场：控制权还给学生，血量拉起 ——
 	Director.switch_control()

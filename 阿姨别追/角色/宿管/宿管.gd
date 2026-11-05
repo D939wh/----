@@ -34,12 +34,15 @@ const CLIMB_OFF_JUMP: float = -180.0
 # ── 挥击 / 抓捕 / 扛人（W2D2，2026-11-04）────────────────────
 # 策划案原数：挥击身前 2 米 × 120° 扇形、1 格伤害、站定才能挥、
 # 后摇 0.8 秒、CD 1.2 秒；拎人移速 −40%（370 × 0.6 = 222）、不能爬梯。
-# 20:01 主人改：抓捕不再是「按住读条」——学生瘫痪后按 G **一键直接扛**。
+# 20:01 主人改过一次：抓捕不再是「按住读条」，学生瘫痪后按 G **一键直接扛**。
+# 11-05 17:30 主人又改回来：照策划案 §6 交互耗时表，「抓捕 1.2 秒」——按住不放才扛走。
+#   想退回一键扛：把下面的 抓捕读条 改成 0.0，一行的事。
 const SWING_RANGE: float = 200.0        # 挥击距离（像素）。2 米 × 100 像素/米
 const SWING_ARC: float = 120.0          # 扇形角度（度）
 const SWING_RAYS: int = 12              # 扇形里打几条射线（越多越密，12 条足够）
 const SWING_RECOVER: float = 0.8        # 后摇：挥完这秒内不能再挥、不能动
 const SWING_CD: float = 1.2             # 冷却：从挥出起算，隔这秒才能再挥
+const 抓捕读条: float = 1.2             # 贴身按住 G 多久才把人扛上肩（策划案 §6）
 const CARRY_STUDENT_OFFSET := Vector2(14, -34)  # 学生扛在肩上的相对位置
 const CARRY_SPEED_MULT: float = 0.6     # 扛人时移速乘它（策划案 −40%）
 
@@ -47,6 +50,8 @@ var _swing_cd_left: float = 0.0         # 挥击冷却还剩几秒
 var _swing_recover_left: float = 0.0    # 后摇还剩几秒（>0 时不能动）
 var _swing_dir: float = 1.0             # 面朝哪边（1 右 / -1 左）。出生默认朝右，之后随方向键更新
 var _carried_student: Node = null       # 正扛着哪个学生（null = 空肩）
+var _抓捕进度: float = 0.0              # 这次按住 G 已经按了多久（秒）
+var _抓捕目标: Node = null              # 正在按住的瘫倒学生（null = 没在抓）
 
 var _on_ladder: bool = false
 var _climbing: bool = false
@@ -118,17 +123,11 @@ func _physics_process(delta: float) -> void:
 
 	# ── W2D2 · 键位各管一件事（20:01 主人定的：攻击/搬运分开，搬运一键）──
 	#   F（interaction）→ 只挥击（攻击）
-	#   G（grab）       → 只扛人：扛着就放下；贴身有瘫痪学生就**一键直接扛**
+	#   G（grab）       → 只扛人：肩上有人就放下；贴身有瘫倒的学生就**按住读条 1.2 秒**扛走
 	_更新朝向()
 	if Input.is_action_just_pressed("interaction"):
 		_挥击()
-	if Input.is_action_just_pressed("grab"):
-		if _carried_student != null:
-			_放下学生()
-		else:
-			var 目标 := _贴身瘫痪学生()
-			if 目标 != null:
-				_扛起(目标)
+	_抓捕(delta)
 
 	# ── 重力 ──
 	if not is_on_floor():
@@ -145,7 +144,11 @@ func _physics_process(delta: float) -> void:
 
 	# ── 跳跃（土狼时间 + 按键记账）──
 	_coyote = COYOTE_TIME if is_on_floor() else maxf(_coyote - delta, 0.0)
-	_buffer = JUMP_BUFFER if Input.is_action_just_pressed("jump") else maxf(_buffer - delta, 0.0)
+	# 按住抓人时不记账：抓人得站定，边跳边抓不合理
+	if Input.is_action_just_pressed("jump") and _抓捕目标 == null:
+		_buffer = JUMP_BUFFER
+	else:
+		_buffer = maxf(_buffer - delta, 0.0)
 
 	if _buffer > 0.0 and _coyote > 0.0:
 		velocity.y = JUMP_VELOCITY
@@ -158,10 +161,13 @@ func _physics_process(delta: float) -> void:
 		velocity.y *= JUMP_CUT
 
 	# ── 左右速度 ──
-	# 两个状态影响移速：后摇站定（挥完那 0.8 秒）、扛人 ×0.6（策划案 −40%）
+	# 三个状态影响移速：后摇站定（挥完那 0.8 秒）、扛人 ×0.6（策划案 −40%）、
+	# 按住抓人时站定（不然能边跑边抓，这 1.2 秒读条就白设了）
 	var 走速 := SPEED
 	if _carried_student != null:
 		走速 = SPEED * CARRY_SPEED_MULT
+	if _抓捕目标 != null:
+		dir = 0.0
 	if dir != 0.0 and _swing_recover_left <= 0.0:
 		var same_dir := signf(velocity.x) == signf(dir)
 		if not (not is_on_floor() and same_dir and absf(velocity.x) > 走速):
@@ -311,6 +317,52 @@ func _贴身瘫痪学生() -> Node:
 		if body != self and body.has_method("被打中") and body.瘫痪:
 			return body
 	return null
+
+
+## G 的全部逻辑：肩上有人就放下；空肩就贴身按住 1.2 秒把人扛走。
+## 为什么改成按住：策划案 §6 交互耗时表写着「抓捕 1.2s」。一键扛等于没有反抗窗口，
+## 宿管贴到人就必抓；按住 1.2 秒给对面留一个「扔下东西就跑」的缝。
+## 什么时候进度清零：松手 / 目标被别人拉起来了 / 目标被搬走了。
+##   —— 这三种都是宿管自己发现自己抓不下去了，不是伸手去改别人身上的状态。
+func _抓捕(delta: float) -> void:
+	# 肩上有人：G 只管放下，不进读条
+	if _carried_student != null:
+		if Input.is_action_just_pressed("grab"):
+			_放下学生()
+		return
+
+	# 刚按下：就近找一个瘫倒的学生，开始计时
+	if Input.is_action_just_pressed("grab"):
+		_抓捕目标 = _贴身瘫痪学生()
+		_抓捕进度 = 0.0
+		if _抓捕目标 != null:
+			print("[宿管] 按住 G 开始抓捕 %s（%.1f 秒）" % [_抓捕目标.name, 抓捕读条])
+		else:
+			print("[宿管] 身边没有瘫倒的学生")
+
+	# 松手 / 本来就没抓到人 → 清零
+	if _抓捕目标 == null or not Input.is_action_pressed("grab"):
+		_取消抓捕()
+		return
+
+	# 按着的这一秒里，目标被别人拉起来了、或者被搬走了 → 抓不下去了
+	if not is_instance_valid(_抓捕目标) or not _抓捕目标.瘫痪 or _抓捕目标.被扛着:
+		print("[宿管] 抓捕中断：%s 已经不在原地瘫着了" % _抓捕目标.name)
+		_取消抓捕()
+		return
+
+	_抓捕进度 += delta
+	velocity.x = 0.0   # 按住抓人的时候站定（跟挥击一样，抓人不是边跑边抓）
+	if _抓捕进度 >= 抓捕读条:
+		var 目标 := _抓捕目标
+		_取消抓捕()      # 先清读条，再扛 —— _扛起 里会改 _carried_student
+		_扛起(目标)
+
+
+## 清掉这次抓捕：进度归零、目标松手。不打印，打印由调用方决定说哪一句
+func _取消抓捕() -> void:
+	_抓捕目标 = null
+	_抓捕进度 = 0.0
 
 
 ## 读条满了：把学生扛上肩。单向接口，学生那边自己 reparent + 清速度
