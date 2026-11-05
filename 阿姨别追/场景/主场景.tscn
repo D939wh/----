@@ -23,6 +23,9 @@ position = Vector2(439, 75)
 [node name="student" parent="." unique_id=1062713042 instance=ExtResource("2_357ng")]
 position = Vector2(879, 178)
 
+[node name="student2" parent="." instance=ExtResource("2_357ng")]
+position = Vector2(960, 178)
+
 [node name="UsableItem" parent="." unique_id=1396500502 instance=ExtResource("4_1xcxt")]
 position = Vector2(1230, 182)
 

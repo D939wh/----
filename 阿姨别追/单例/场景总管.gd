@@ -101,20 +101,56 @@ func register_controllable(who: Node) -> void:
 
 
 ## 按 F1 调这个：换到下一个角色，转一圈回到第一个
+## （2026-11-05 起它只是 set_control 的一个调用者，自己不再直接改 当前控制）
 func switch_control() -> void:
+	_剔除失效()
 	if _controllables.size() < 2:
 		print("[总管] 现在只有一个可控制角色，没得换")
 		return
-	var 旧的: Node = 当前控制
 	var i := _controllables.find(当前控制)
-	当前控制 = _controllables[(i + 1) % _controllables.size()]
+	set_control(_controllables[(i + 1) % _controllables.size()])
+
+
+## 直接指定「现在控谁」。成功返回 true，这个人不在可控制名单里返回 false。
+##
+## 【为什么要它】（2026-11-05 加）
+##   F1 只能一个一个往下轮：场上两个人还行，人一多就要按好几次才轮到想看的那个。
+##   开发者模式改成「鼠标点谁就控谁」之后，从这里一步到位。
+##   点名这件事必须由总管做——它才是记着「谁可控制」的那本账，
+##   面板只负责把「点了哪个坐标」翻译成人，不自己维护名单。
+func set_control(who: Node) -> bool:
+	_剔除失效()
+	if who == null or not (who in _controllables):
+		return false
+	if who == 当前控制:
+		return true
+	var 旧的: Node = 当前控制
 	# 把旧角色身上的速度清干净：不然切走之后她还会顺着惯性滑一段，
 	# 调试时容易看成「她怎么自己动了」。
-	if 旧的 != null and 旧的 is CharacterBody2D:
+	if 旧的 != null and is_instance_valid(旧的) and 旧的 is CharacterBody2D:
 		旧的.velocity = Vector2.ZERO
+	当前控制 = who
 	_相机交给(当前控制)
 	control_changed.emit(当前控制)
 	print("[总管] 换人 —— 现在控制：%s" % 当前控制.name)
+	return true
+
+
+## 把已经被删掉的角色从名单里剔掉。
+## 不剔会怎样：测试里复制出来的临时学生 queue_free 之后，名单里还留着一个死节点，
+## 下次换人时对着一具空壳调 get_node，当场崩（11-05 真的这么崩过一次）。
+func _剔除失效() -> void:
+	var 有效: Array[Node] = []
+	for one in _controllables:
+		if is_instance_valid(one):
+			有效.append(one)
+	if 有效.size() == _controllables.size():
+		return
+	_controllables = 有效
+	if 当前控制 != null and not is_instance_valid(当前控制):
+		当前控制 = _controllables[0] if _controllables.size() > 0 else null
+		_相机交给(当前控制)
+		control_changed.emit(当前控制)
 
 
 ## 把镜头交给它。每个角色自带一个相机，同一时刻只开一个

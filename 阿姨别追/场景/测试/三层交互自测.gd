@@ -30,6 +30,8 @@ func _ready() -> void:
 
 	var s: CharacterBody2D = scene.get_node("student")
 	var k: CharacterBody2D = scene.get_node("keeper")
+	# 11-05：主场景多了第二个学生，挪到走廊尽头，别混进这一轮的感应区
+	scene.get_node("student2").global_position = Vector2(1500, 178)
 	var agent: Node = scene.get_node("FloorAgent")
 	var 东门: Node = agent.get_door("1-走廊东")
 	var 西门: Node = agent.get_door("1-走廊西")
@@ -78,7 +80,7 @@ func _ready() -> void:
 
 	# ── ⑥ 宿管的 E 也走同一条链路（1.5 秒慢开，所以等久一点）──
 	# 西门在 (620,178)，宿管站 (560,178)。先把控制权切到宿管。
-	Director.switch_control()
+	Director.set_control(k)   # 11-05：直接点名，不然第一下轮到的是第二个学生
 	k.global_position = Vector2(560, 178)
 	await _wait(0.2)
 	_记("⑥ 宿管感应区里有门", _感应区里有(k, "door"))
@@ -89,7 +91,7 @@ func _ready() -> void:
 
 	# ── ⑦ 空处按键不该出事（玩家最常做错的事）──
 	s.global_position = Vector2(300, 178)
-	Director.switch_control()   # 控制权还给学生
+	Director.set_control(s)   # 控制权还给学生
 	await _wait(0.2)
 	await _tap("open_door")
 	await _tap("interaction")

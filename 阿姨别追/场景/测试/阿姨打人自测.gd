@@ -21,9 +21,13 @@ func _ready() -> void:
 
 	s = scene.get_node("student")
 	k = scene.get_node("keeper")
+	# 11-05：主场景多了第二个学生，它正好站在 960，会和测试布景重叠。
+	# 挪到走廊另一头去，让这一局只有「一个宿管 + 一个学生」在演。
+	scene.get_node("student2").global_position = Vector2(1500, 208)
 
 	# —— 布景：宿管控制，学生站她右边 60px ——
-	Director.switch_control()
+	# 11-05 改：场上多了第二个学生，F1 轮换的第一下不再是宿管，改成直接点名，免得顺序一变就测错人
+	Director.set_control(k)
 	k.global_position = Vector2(900, 208)
 	s.global_position = Vector2(960, 208)
 	await _wait(0.2)
@@ -148,7 +152,7 @@ func _ready() -> void:
 	r["自救2秒后"] = "还瘫着=%s（应 false）/ 血量 %d（应 2）" % [s.瘫痪, s.血量]
 
 	# —— 恢复现场：控制权还给学生，血量拉起 ——
-	Director.switch_control()
+	Director.set_control(s)
 	s.拉起()
 
 	print("=== 阿姨打人全流程自测 ===")
