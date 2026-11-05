@@ -60,6 +60,14 @@ var _救人进度: float = 0.0                 # 这次按住 H 已经按了多�
 var _自救进度: float = 0.0                 # 瘫在地上按住 H 自己爬了多久
 
 
+# ── 通用读条（2026-11-05）────────────────────────────────────
+# 拉起队友 4 秒、自救 2 秒，这两件事都是「按住不放」，玩家得看见还剩几秒。
+# 条本身住在 `界面/读条/`，它只负责画；「已经按了多久」还是这上面的
+# _救人进度 / _自救进度 说了算 —— 进度只有一个真源，条是镜子。
+const 读条 := preload("res://界面/读条/读条.gd")
+var _读条条: CanvasLayer = null
+
+
 # ── W1D4 搬运与道具 ─────────────────────────────────────────
 # 角色状态只分两种：空手 / 负重。别的代码问一句「你现在搬着没」就能分支。
 # 以后 W3 加「被逮/蹲地」就往这个 enum 里加值，不用到处加 if。
@@ -141,10 +149,15 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 
-	# 开发者模式（2026-11-03）：F1 切到宿管身上时，学生原地站住。
+	# 开发者模式（2026-11-03）：F1/点击切到宿管身上时，学生原地站住。
 	# 不吃键盘，但重力照常 —— 不会浮在半空，也不会自己走路。
 	# 这一整段只在「有人接管了控制权」时才起作用，正常单人玩永远是 false。
+	# 2026-11-05 补：正在拉人拉到一半被切走 → 这次救援作废、条收掉。
+	# 不收的话这根条会一直亮在头顶：这个分支之后整个函数就早退了，
+	# 再没有任何一帧会回来推进它，玩家看到的就是「进度条卡住不动」。
 	if Director.当前控制 != null and Director.当前控制 != self:
+		if _救人目标 != null:
+			_取消救人()
 		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
 		if not is_on_floor():
 			velocity.y += GRAVITY * delta
@@ -430,6 +443,19 @@ func _贴身瘫痪队友() -> Node:
 	return null
 
 
+## 我这根读条。第一次真要用了才建（那时场景已经搭好，挂哪儿不会错）
+func _我的读条() -> CanvasLayer:
+	if _读条条 == null or not is_instance_valid(_读条条):
+		_读条条 = 读条.新建(self)
+	return _读条条
+
+
+## 收条。没建过就不建 —— 不能为了「收一根还不存在的条」反而去造一根
+func _收读条() -> void:
+	if _读条条 != null and is_instance_valid(_读条条):
+		_读条条.收()
+
+
 ## 站着按住 H 拉队友。返回「我现在正忙着读条」——调用方据此把人钉在原地
 func _推进救人(delta: float) -> bool:
 	# 刚按下：就近找一个瘫倒的队友
@@ -439,6 +465,7 @@ func _推进救人(delta: float) -> bool:
 			_救人进度 = 0.0
 			if _救人目标 != null:
 				print("[学生] 开始拉 %s（按住 %.0f 秒）" % [_救人目标.name, 拉起读条])
+				_我的读条().开始(self, "拉队友", 拉起读条)
 			else:
 				print("[学生] 身边没有瘫倒的队友")
 		if _救人目标 == null:
@@ -456,7 +483,8 @@ func _推进救人(delta: float) -> bool:
 		return false
 
 	_救人进度 += delta
-	# 淡黄 = 正在用力拉（没有 HUD 进度条，这是唯一的肉眼反馈）
+	_我的读条().推进(_救人进度)   # 条跟着走：填到几分、还剩几秒
+	# 淡黄 = 正在用力拉（读条之外的第二重肉眼反馈）
 	$AnimatedSprite2D.modulate = Color(1.0, 1.0, 0.75)
 	if _救人进度 >= 拉起读条:
 		var 目标 := _救人目标
@@ -466,24 +494,31 @@ func _推进救人(delta: float) -> bool:
 	return true
 
 
-## 清掉这次救援：进度归零、颜色还原。不打印，说哪句话由调用方定
+## 清掉这次救援：进度归零、颜色还原、条收起。不打印，说哪句话由调用方定
 func _取消救人() -> void:
 	_救人目标 = null
 	_救人进度 = 0.0
+	_收读条()
 	$AnimatedSprite2D.modulate = Color.WHITE
 
 
-## 瘫痪时按住 H：自己爬起来。颜色从「红」慢慢变白就是读条进度
+## 瘫痪时按住 H：自己爬起来。条走满 2 秒就站起来（颜色从红变白是第二重反馈）
 func _推进自救(delta: float) -> void:
 	if not Input.is_action_pressed("self_rescue"):
 		_自救进度 = 0.0
+		_收读条()
 		if not 被扛着:
 			$AnimatedSprite2D.modulate = 瘫痪变色
 		return
+	# 刚按下（进度还在 0）：开一根条。之后每帧只报进度，不重复开
+	if _自救进度 <= 0.0:
+		_我的读条().开始(self, "自救", 自救读条)
 	_自救进度 += delta
+	_我的读条().推进(_自救进度)
 	$AnimatedSprite2D.modulate = 瘫痪变色.lerp(Color.WHITE, minf(_自救进度 / 自救读条, 1.0))
 	if _自救进度 >= 自救读条:
 		_自救进度 = 0.0
+		_收读条()
 		$AnimatedSprite2D.modulate = Color.WHITE
 		拉起()
 		print("[学生] 自救成功，自己爬起来了")

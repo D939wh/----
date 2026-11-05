@@ -56,6 +56,12 @@ var _抓捕目标: Node = null              # 正在按住的瘫倒学生（null
 var _on_ladder: bool = false
 var _climbing: bool = false
 
+# ── 通用读条（2026-11-05）────────────────────────────────────
+# 按住 G 抓人这 1.2 秒得让玩家看见还剩多少，不然「按了没反应」。
+# 条住在 `界面/读条/`，只负责画；「已经按了多久」还是 _抓捕进度 说了算。
+const 读条 := preload("res://界面/读条/读条.gd")
+var _读条条: CanvasLayer = null
+
 var _coyote: float = 0.0
 var _buffer: float = 0.0
 var _hang_left: float = 0.0
@@ -92,7 +98,12 @@ func _physics_process(delta: float) -> void:
 	_swing_recover_left = maxf(_swing_recover_left - delta, 0.0)
 
 	# 没被控制时：不吃键盘，但照常受重力，不会浮在空中
+	# 2026-11-05 补：正按住 G 抓到一半被切走 → 这次抓捕作废、条收掉。
+	# 不收的话这根条会一直亮在头顶：这个分支之后整个函数就早退了，
+	# 再没有任何一帧会回来推进它，玩家看到的就是「进度条卡住不动」。
 	if not _受控():
+		if _抓捕目标 != null:
+			_取消抓捕()
 		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
 		if not is_on_floor():
 			velocity.y += GRAVITY * delta
@@ -319,6 +330,19 @@ func _贴身瘫痪学生() -> Node:
 	return null
 
 
+## 我这根读条。第一次真要用了才建（那时场景已经搭好，挂哪儿不会错）
+func _我的读条() -> CanvasLayer:
+	if _读条条 == null or not is_instance_valid(_读条条):
+		_读条条 = 读条.新建(self)
+	return _读条条
+
+
+## 收条。没建过就不建 —— 不能为了「收一根还不存在的条」反而去造一根
+func _收读条() -> void:
+	if _读条条 != null and is_instance_valid(_读条条):
+		_读条条.收()
+
+
 ## G 的全部逻辑：肩上有人就放下；空肩就贴身按住 1.2 秒把人扛走。
 ## 为什么改成按住：策划案 §6 交互耗时表写着「抓捕 1.2s」。一键扛等于没有反抗窗口，
 ## 宿管贴到人就必抓；按住 1.2 秒给对面留一个「扔下东西就跑」的缝。
@@ -337,6 +361,7 @@ func _抓捕(delta: float) -> void:
 		_抓捕进度 = 0.0
 		if _抓捕目标 != null:
 			print("[宿管] 按住 G 开始抓捕 %s（%.1f 秒）" % [_抓捕目标.name, 抓捕读条])
+			_我的读条().开始(self, "抓捕", 抓捕读条)
 		else:
 			print("[宿管] 身边没有瘫倒的学生")
 
@@ -352,17 +377,19 @@ func _抓捕(delta: float) -> void:
 		return
 
 	_抓捕进度 += delta
+	_我的读条().推进(_抓捕进度)   # 条跟着走：填到几分、还剩几秒
 	velocity.x = 0.0   # 按住抓人的时候站定（跟挥击一样，抓人不是边跑边抓）
 	if _抓捕进度 >= 抓捕读条:
 		var 目标 := _抓捕目标
-		_取消抓捕()      # 先清读条，再扛 —— _扛起 里会改 _carried_student
+		_取消抓捕()      # 先清读条、收条，再扛 —— _扛起 里会改 _carried_student
 		_扛起(目标)
 
 
-## 清掉这次抓捕：进度归零、目标松手。不打印，打印由调用方决定说哪一句
+## 清掉这次抓捕：进度归零、目标松手、条收起。不打印，打印由调用方决定说哪一句
 func _取消抓捕() -> void:
 	_抓捕目标 = null
 	_抓捕进度 = 0.0
+	_收读条()
 
 
 ## 读条满了：把学生扛上肩。单向接口，学生那边自己 reparent + 清速度

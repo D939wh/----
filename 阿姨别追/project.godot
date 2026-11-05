@@ -44,6 +44,7 @@ folder_colors={
 "res://界面/": "pink",
 "res://界面/调试面板/": "gray",
 "res://界面/道具格/": "pink",
+"res://界面/读条/": "pink",
 "res://素材/": "red",
 "res://角色/": "orange",
 "res://角色/学生/": "yellow",

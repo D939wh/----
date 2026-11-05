@@ -1,0 +1,61 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://界面/读条/读条.gd" id="1_bar"]
+
+[sub_resource type="SystemFont" id="SystemFont_cn"]
+font_names = PackedStringArray("Microsoft YaHei", "SimHei", "Noto Sans CJK SC", "sans-serif")
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bar"]
+bg_color = Color(0.1, 0.13, 0.16, 0.92)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.95, 0.78, 0.47, 0.55)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[node name="读条" type="CanvasLayer"]
+layer = 5
+script = ExtResource("1_bar")
+
+[node name="框" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 0
+offset_right = 64.0
+offset_bottom = 6.0
+mouse_filter = 2
+
+[node name="底" type="Panel" parent="框"]
+layout_mode = 0
+offset_right = 64.0
+offset_bottom = 6.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bar")
+
+[node name="填充" type="ColorRect" parent="框"]
+layout_mode = 0
+offset_left = 1.0
+offset_top = 1.0
+offset_right = 63.0
+offset_bottom = 5.0
+mouse_filter = 2
+color = Color(0.98, 0.82, 0.42, 1)
+
+[node name="文字" type="Label" parent="框"]
+layout_mode = 0
+offset_top = -16.0
+offset_right = 64.0
+offset_bottom = -2.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.97, 0.88, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 2
+theme_override_fonts/font = SubResource("SystemFont_cn")
+theme_override_font_sizes/font_size = 12
+text = "1.0s"
+horizontal_alignment = 1
+vertical_alignment = 1
