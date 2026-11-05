@@ -1,0 +1,24 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://交互物/钥匙板/钥匙板.gd" id="1_key"]
+[ext_resource type="Texture2D" path="res://素材/道具/钥匙/钥匙_占位.png" id="2_tex"]
+
+[sub_resource type="RectangleShape2D" id="Rect_key"]
+size = Vector2(36, 24)
+
+[node name="KeyPlate" type="Area2D" groups=["carryable"]]
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("1_key")
+"重量" = 15.0
+
+[node name="板" type="Polygon2D" parent="."]
+color = Color(0.79, 0.64, 0.15, 1)
+polygon = PackedVector2Array(-18, -12, 18, -12, 18, 12, -18, 12)
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(0, -1)
+texture = ExtResource("2_tex")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("Rect_key")

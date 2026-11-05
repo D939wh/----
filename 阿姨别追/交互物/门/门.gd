@@ -66,6 +66,21 @@ func press(who: Node) -> void:
 	Director.door_pressed.emit(floor_id, door_id, who)
 
 
+## 被解锁：三个锁孔插满时，由楼层代理替门喊这一句（2026-11-05）
+##
+## 【为什么不用 press()】
+##   press 是「谁在推门」，要记是谁推的、按那个人的速度慢慢开。
+##   解锁不是推出来的，是锁开了 —— 没有推的人，也不需要几秒，就是弹开。
+##   硬套 press 会得出「宿管推的所以按 1.5 秒慢慢开」这种荒唐结果。
+func 被解锁() -> void:
+	_user = null
+	_amount = 1.0
+	_target = 1.0
+	_apply()                                   # 门板藏掉、碰撞体撤掉，人能过
+	Director.door_finished.emit(floor_id, door_id, true)
+	print("[门] %s 被解锁，弹开了" % door_id)
+
+
 func _process(delta: float) -> void:
 	if is_equal_approx(_amount, _target):
 		return

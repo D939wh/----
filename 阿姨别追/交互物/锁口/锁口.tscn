@@ -1,0 +1,33 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://交互物/锁口/锁口.gd" id="1_lock"]
+
+[sub_resource type="RectangleShape2D" id="Rect_zone"]
+size = Vector2(56, 96)
+
+[node name="LockPlate" type="Node2D"]
+script = ExtResource("1_lock")
+
+[node name="板" type="Polygon2D" parent="."]
+color = Color(0.16, 0.16, 0.18, 1)
+polygon = PackedVector2Array(-20, -96, 20, -96, 20, 0, -20, 0)
+
+[node name="孔1" type="Polygon2D" parent="."]
+color = Color(0.1, 0.1, 0.12, 1)
+polygon = PackedVector2Array(-6, -78, 6, -78, 6, -66, -6, -66)
+
+[node name="孔2" type="Polygon2D" parent="."]
+color = Color(0.1, 0.1, 0.12, 1)
+polygon = PackedVector2Array(-6, -58, 6, -58, 6, -46, -6, -46)
+
+[node name="孔3" type="Polygon2D" parent="."]
+color = Color(0.1, 0.1, 0.12, 1)
+polygon = PackedVector2Array(-6, -38, 6, -38, 6, -26, -6, -26)
+
+[node name="Zone" type="Area2D" parent="." groups=["keyhole"]]
+collision_layer = 8
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Zone"]
+position = Vector2(0, -48)
+shape = SubResource("Rect_zone")

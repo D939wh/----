@@ -1,0 +1,221 @@
+extends Node2D
+## 锁口 —— 门板上那排锁孔。三个孔各认一块钥匙板，插满三块门就开
+##
+## 【这套写法是照谁抄的】
+##   照「门」。门自己管「现在开到哪儿」，锁口自己管「插进去几块、这一块插到几成」。
+##   学生只说一句「我按了 R，我碰到了这些」，剩下全在楼层代理和这里。
+##   学生脚本里没有锁口、没有编号、没有「几秒」—— 加第四块钥匙、加第二个锁口，
+##   学生一个字都不用改。
+##
+## 【为什么读条放在这里数，不放在学生身上】
+##   跟门一个道理：插进去要多久是「这个锁口」的属性，不是「这个人」的属性。
+##   以后想做一道「谁都得插 5 秒」的加固锁，只改清单里那一行，不用碰任何角色。
+##   学生那边只多一个「钉住」开关：插的过程中不能走、不能跳、不能跳窗。
+##
+## 【进度条怎么来的】
+##   用 `界面/读条/` 那根通用的，挂在插钥匙的人头顶，写「插钥匙 1.4s」。
+##   条只负责画，进度真源是这里的 `_进度`；所以不会出现「条走满了门没开」。
+##
+## 【谁通知门开】
+##   不是这里直接去喊门。这里只往上报一句「我插满了」，由这一层的代理去开哪扇门 ——
+##   锁口不该知道门叫什么名字，就像门不该知道推它的人叫什么。
+
+const 读条脚本 := preload("res://界面/读条/读条.gd")
+const 清单 = preload("res://数据/楼层清单.gd")
+
+## 孔是灭的时候的颜色
+const 暗色 := Color(0.10, 0.10, 0.12, 1.0)
+
+## 必须拿对牌子的那个孔吗？
+##   true  = 一号只认一号孔（策划案 v0.5 的规则）
+##   false = 随便哪个空孔都能插，凑满三个就行（策划案说的「这条可关」）
+## 改这一个开关就退化，代码不用动。
+@export var 要求配对: bool = true
+
+var floor_id: String = ""
+var lock_id: String = ""
+
+var _插孔用时: float = 2.0      # 由代理照清单填。0.1 基本等于按一下就进
+var _连哪扇门: String = ""      # 插满时开哪扇门（名字，不是节点）
+
+## 编号 -> { "亮": bool, "色": Color, "节点": Polygon2D }
+var _孔: Dictionary = {}
+
+## 这一次插的进度。0 = 没在插
+var _进行中: bool = false
+var _谁: Node = null            # 谁在插
+var _在读: Area2D = null        # 手上那块板子
+var _本次孔: String = ""        # 这一次插的是哪个孔
+var _进度: float = 0.0
+var _读条: CanvasLayer = null
+
+
+func _ready() -> void:
+	# 场景里固定摆着三个孔节点（孔1/孔2/孔3），这里把它们和编号对起来。
+	# 颜色从清单取 —— 和钥匙板铁牌是同一份，不会出现「钥匙黄、孔红」。
+	var i := 0
+	for 号 in 清单.钥匙板编号:
+		var 节点 := get_node_or_null("孔%d" % (i + 1)) as Polygon2D
+		if 节点 != null:
+			节点.color = 暗色
+			_孔[号] = {
+				"亮": false,
+				"色": 清单.钥匙板配色.get(号, Color.WHITE),
+				"节点": 节点,
+			}
+		i += 1
+
+
+## 由楼层代理按清单调用：哪层、哪个锁口、站哪、插一块要几秒、插满开哪扇门
+func setup(f: String, id: String, pos: Vector2, 用时: float, 门: String) -> void:
+	floor_id = f
+	lock_id = id
+	position = pos
+	_插孔用时 = maxf(用时, 0.01)
+	_连哪扇门 = 门
+
+
+## 有人按 R 想插钥匙。返回 true = 接下了（开始读条）
+##
+## 【为什么先检查再读条，而不是读条完了才检查】
+##   拿错了牌子、孔已经插过了 —— 这两种情况必须**当场**告诉玩家，
+##   不能让人傻站 2 秒再失败。而且错的牌子不消耗任何东西，转身就能去换。
+func 插(谁: Node) -> bool:
+	if _进行中:
+		return false   # 已经在插了，再按一次 R 不该重来
+	if 谁 == null or not is_instance_valid(谁):
+		return false
+
+	var 货: Node = null
+	if 谁.has_method("手上扛着"):
+		货 = 谁.手上扛着()
+	if 货 == null:
+		print("[锁口] %s：空着手插不了" % lock_id)
+		return false
+
+	var 号 := str(货.get("编号"))
+	if 号 == "":
+		print("[锁口] %s：扛的不是钥匙板" % lock_id)
+		return false
+
+	var 孔号 := _选孔(号)
+	if 孔号 == "":
+		if _孔.has(号) and bool(_孔[号]["亮"]):
+			print("[锁口] %s：%s 的孔已经插过了，这门上没别的位置给它" % [lock_id, 号])
+		else:
+			print("[锁口] %s：这块是「%s」，这门上没这个孔" % [lock_id, 号])
+		return false
+
+	_进行中 = true
+	_谁 = 谁
+	_在读 = 货
+	_本次孔 = 孔号
+	_进度 = 0.0
+	if 谁.has_method("钉住"):
+		谁.钉住(true)          # 插的过程中人不能动
+	_读条 = 读条脚本.新建(self)
+	_读条.开始(谁, "插钥匙", _插孔用时)
+	print("[锁口] %s 开始插「%s」（%.1f 秒）" % [lock_id, 号, _插孔用时])
+	return true
+
+
+func _process(delta: float) -> void:
+	if not _进行中:
+		return
+
+	# 插到一半，人没了 / 被打瘫了 / 玩家换人了 → 这次作废。
+	# 最后一种最容易被漏掉：换了人之后那个角色整个 `_physics_process` 早退，
+	# 再没有一帧会回来推进读条，条就会永久挂在头顶（读条组件那次踩过）。
+	if not is_instance_valid(_谁) or _谁.瘫痪 or not _还受控():
+		_中断("插钥匙的人没了 / 被打断了 / 被切走了")
+		return
+
+	_进度 += delta
+	if _读条 != null:
+		_读条.推进(_进度)
+	if _进度 >= _插孔用时:
+		_完成()
+
+
+## 现在是不是玩家还在操作「插钥匙的那个人」
+func _还受控() -> bool:
+	var 控: Node = Director.当前控制
+	return 控 == null or 控 == _谁
+
+
+## 这块板子该插哪个孔。返回 "" = 插不进去
+func _选孔(号: String) -> String:
+	if 要求配对:
+		if not _孔.has(号):
+			return ""
+		if bool(_孔[号]["亮"]):
+			return ""
+		return 号
+	# 不要求配对：从左往右找第一个空孔
+	for k in _孔:
+		if not bool(_孔[k]["亮"]):
+			return k
+	return ""
+
+
+func _完成() -> void:
+	var 谁 := _谁
+	var 孔号 := _本次孔
+
+	_收场()          # 先把进度、读条、钉住清干净，再做「插上了」这件事
+
+	if _孔.has(孔号):
+		_孔[孔号]["亮"] = true
+		(_孔[孔号]["节点"] as Polygon2D).color = _孔[孔号]["色"]
+
+	# 板子从手上消失：人回到空手状态，铁牌钉在孔上（孔亮起就是它）
+	var 货: Node = null
+	if is_instance_valid(谁) and 谁.has_method("交出搬运物"):
+		货 = 谁.交出搬运物()
+	if 货 == null and is_instance_valid(_在读):
+		货 = _在读
+	if 货 != null and is_instance_valid(货):
+		货.queue_free()
+
+	print("[锁口] %s 插上「%s」，%d/%d" % [lock_id, 孔号, _亮孔数(), _孔.size()])
+
+	if _亮孔数() >= _孔.size() and _孔.size() > 0:
+		_全插满()
+
+
+func _全插满() -> void:
+	print("[锁口] %s 三个孔都插满了，喊门开" % lock_id)
+	# 往上只报一句，谁去开门是代理的事（锁口不认识门）
+	Director.report(floor_id, "unlock", { "锁口": lock_id, "门": _连哪扇门 })
+
+
+func _中断(原因: String) -> void:
+	print("[锁口] %s 插到一半断了：%s" % [lock_id, 原因])
+	_收场()
+
+
+## 把「正在插」这件事清干净。完成和中断都走这里
+func _收场() -> void:
+	if is_instance_valid(_谁) and _谁.has_method("钉住"):
+		_谁.钉住(false)
+	if _读条 != null and is_instance_valid(_读条):
+		_读条.收()
+	_读条 = null
+	_进行中 = false
+	_进度 = 0.0
+	_谁 = null
+	_在读 = null
+	_本次孔 = ""
+
+
+func _亮孔数() -> int:
+	var n := 0
+	for k in _孔:
+		if bool(_孔[k]["亮"]):
+			n += 1
+	return n
+
+
+## 给外部查：这个锁口插了几块了
+func 已插数() -> int:
+	return _亮孔数()

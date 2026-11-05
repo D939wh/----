@@ -35,6 +35,9 @@ enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg", "res://addons/godo
 folder_colors={
 "res://交互物/": "blue",
 "res://交互物/门/": "blue",
+"res://交互物/钥匙板/": "blue",
+"res://交互物/锁口/": "blue",
+"res://交互物/出口/": "blue",
 "res://单例/": "green",
 "res://参考资料/": "gray",
 "res://场景/": "yellow",

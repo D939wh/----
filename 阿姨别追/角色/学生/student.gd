@@ -55,6 +55,16 @@ const 瘫痪碰撞层: int = 2
 var 血量: int = MAX_HP                     # 现在还剩几格
 var 瘫痪: bool = false                     # 两格打空了？瘫了不能动
 var 被扛着: bool = false                    # 现在正被宿管扛在肩上？
+
+## 正被钉在原地（2026-11-05 加）。现在只有一个来源：往锁孔里插钥匙的那 2 秒。
+## 【为什么这个开关在角色身上，而不是"谁锁的就由谁每帧按住他"】
+##   角色每一帧都得知道自己能不能吃键盘；让锁口每帧过来按一下，两边的帧序
+##   一旦错开就会出现「这一帧放开了、下一帧又被按回去」的抖动。
+##   所以：锁口说一句「钉住」，角色自己记住，直到锁口说「松开」。
+## 【和瘫痪/被扛的区别】瘫痪是"我被打坏了"，被扛是"我在别人肩上"，被钉住是
+##   "我自己正忙着插一把钥匙"——三种都让人动不了，但来源完全不同，所以分开记。
+var 被钉住: bool = false
+
 var _救人目标: Node = null                 # 正被拉着的瘫倒队友（null = 没在拉）
 var _救人进度: float = 0.0                 # 这次按住 H 已经按了多久（秒）
 var _自救进度: float = 0.0                 # 瘫在地上按住 H 自己爬了多久
@@ -146,6 +156,20 @@ func _physics_process(delta: float) -> void:
 		# 玩家按一下 H，所有躺着的都会自己爬起来 —— 那就不是自救了，是全体起立。
 		if Director.当前控制 == null or Director.当前控制 == self:
 			_推进自救(delta)
+		move_and_slide()
+		return
+
+	# ── 被钉住：正在往锁孔里插钥匙（2026-11-05）────────────────
+	# 插钥匙那两秒，人是站在门口不动的（主人反复强调过这件事）。
+	# 不吃键盘、不能跳、不能爬，但重力照常 —— 脚下的地要是没了，该掉还是得掉。
+	# 【为什么放在瘫痪后面】被打瘫比"插钥匙"更该优先：瘫了就瘫了，
+	# 插钥匙这件事由锁口自己发现并中断（锁口每帧都会看这个人瘫没瘫）。
+	if 被钉住:
+		velocity.x = 0.0
+		if not is_on_floor():
+			velocity.y += GRAVITY * delta
+		else:
+			velocity.y = 0.0
 		move_and_slide()
 		return
 
@@ -283,6 +307,11 @@ func _update_interaction() -> void:
 	if Input.is_action_just_pressed("use_item") and _item_icon != null:
 		_use_item()
 
+	# R 键：把手上的板子往锁孔里插（2026-11-05）
+	# 「插多久、对不对孔、插上以后门开不开」全不在这里 —— 这里只喊一声。
+	if Input.is_action_just_pressed("insert_key"):
+		_insert_key()
+
 # ============================================================
 # 【2026-11-04 修架构】我碰了东西，但我不猜那是什么
 # ------------------------------------------------------------
@@ -326,6 +355,46 @@ func _pick_or_drop() -> void:
 		_drop_box()
 		return
 	_上报交互("interaction")
+
+# R 键：把手上这块板子往锁孔里插（2026-11-05）
+# 空手按 R 什么都不做 ——「我手上有没有货」是我自己的状态，我自己知道。
+# 至于前面有没有锁口、这块牌子对不对孔、插进去要几秒，我一个都不看：
+# 那是楼层代理和锁口的事（策划案 §7.6.2：角色不许知道场景里有什么）。
+func _insert_key() -> void:
+	if _carry_state != CarryState.CARRYING:
+		return
+	_上报交互("insert_key")
+
+
+## 我现在扛着什么？空手返回 null。给锁口用：它要知道插进来的是哪块板子
+func 手上扛着() -> Node:
+	if _carry_state != CarryState.CARRYING:
+		return null
+	return _carried
+
+
+## 把扛着的东西交出去（不扔回场景，交给调用方处置）。
+## 锁口插上钥匙那一刻用：板子要从手上消失、人回到空手、速度恢复。
+## 【为什么不用 _drop_box】那个是「放下」——会 reparent 回场景、落在脚边；
+## 插进锁孔的板子不该掉在地上，它已经不在世界里了。
+func 交出搬运物() -> Node:
+	if _carry_state != CarryState.CARRYING:
+		return null
+	var 货 := _carried
+	_carried = null
+	_carry_state = CarryState.EMPTY
+	_应用负重(0.0)
+	return 货
+
+
+## 钉住 / 松开（锁口在插钥匙那几秒里调）。
+## 钉住期间这个人不吃键盘：不走、不跳、不爬、不交互。
+## 「什么时候松开」不归它管：锁口插完、被打断、人没了都会记得来松一句。
+func 钉住(开: bool) -> void:
+	被钉住 = 开
+	if 开:
+		velocity.x = 0.0
+
 
 # 扛起箱子：变成箱子的父节点，位置摆在身前（超重的拖在地上）
 # 从这一行开始，人就被它的重量拖住了 —— 具体罚多少问 `数据/重量档位.gd`

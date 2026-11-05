@@ -10,6 +10,9 @@ extends Node2D
 
 const 清单 = preload("res://数据/楼层清单.gd")
 const 门场景 = preload("res://交互物/门/门.tscn")
+const 钥匙板场景 = preload("res://交互物/钥匙板/钥匙板.tscn")
+const 锁口场景 = preload("res://交互物/锁口/锁口.tscn")
+const 出口场景 = preload("res://交互物/出口/出口.tscn")
 
 ## 这一层叫什么名字，要和清单里的名字对得上
 @export var floor_id: String = "一楼"
@@ -17,10 +20,22 @@ const 门场景 = preload("res://交互物/门/门.tscn")
 ## 编号 -> 门节点。以后灯、柜子也各自有一本这样的账
 var _doors: Dictionary = {}
 
+## 编号 -> 钥匙板节点（"一号"/"二号"/"三号"）
+var _keys: Dictionary = {}
+
+## 编号 -> 锁口节点
+var _locks: Dictionary = {}
+
+## 编号 -> 出口判定区
+var _exits: Dictionary = {}
+
 
 func _ready() -> void:
 	Director.register_floor(floor_id, self)
 	_seed_doors()
+	_seed_keys()
+	_seed_locks()
+	_seed_exits()
 
 
 ## 照清单把门建出来。位置、开门用时全部来自数据文件，脚本里没有写死任何一个数字
@@ -35,15 +50,81 @@ func _seed_doors() -> void:
 	print("[代理·%s] 照清单建了 %d 扇门" % [floor_id, _doors.size()])
 
 
+## 照清单把钥匙板摆出来。
+## 【颜色从哪来】清单顶部的 `钥匙板配色`，和门上的锁孔是同一份 ——
+## 两边各写一份颜色，早晚会变成「钥匙是黄的、孔是红的」，玩家插不进去还查不出原因。
+func _seed_keys() -> void:
+	var data: Dictionary = 清单.楼层.get(floor_id, {})
+	for one in data.get("钥匙板", []):
+		var k: Node2D = 钥匙板场景.instantiate()
+		add_child(k)
+		var 号: String = one["编号"]
+		k.setup(号, one["位置"], 清单.钥匙板配色.get(号, Color.WHITE))
+		_keys[号] = k
+	print("[代理·%s] 照清单摆了 %d 块钥匙板" % [floor_id, _keys.size()])
+
+
+## 照清单把锁口建出来。插一块几秒、插满开哪扇门，全在清单里
+func _seed_locks() -> void:
+	var data: Dictionary = 清单.楼层.get(floor_id, {})
+	for one in data.get("锁口", []):
+		var p: Node2D = 锁口场景.instantiate()
+		add_child(p)
+		p.setup(
+			floor_id,
+			one["编号"],
+			one["位置"],
+			float(one.get("插孔用时", 2.0)),
+			str(one.get("连哪扇门", ""))
+		)
+		_locks[one["编号"]] = p
+	print("[代理·%s] 照清单建了 %d 个锁口" % [floor_id, _locks.size()])
+
+
+## 照清单把门口判定区摆出来。它听门开门关的广播，不靠谁去通知
+func _seed_exits() -> void:
+	var data: Dictionary = 清单.楼层.get(floor_id, {})
+	for one in data.get("出口", []):
+		var e: Node2D = 出口场景.instantiate()
+		add_child(e)
+		e.setup(
+			floor_id,
+			one["编号"],
+			one["位置"],
+			str(one.get("等的门", "")),
+			float(one.get("站多久", 1.0))
+		)
+		_exits[one["编号"]] = e
+	print("[代理·%s] 照清单建了 %d 个出口" % [floor_id, _exits.size()])
+
+
 ## 总管把话递到这里。以后「灯要亮」「柜子要弹开」也走这一个口
 func on_report(event: String, data: Dictionary) -> void:
 	match event:
 		"interact":
 			_处理交互(data)
+		"unlock":
+			_处理解锁(data)
 		"door_pressed":
 			print("[代理·%s] 收到：%s 被按了" % [floor_id, data.get("door_id", "?")])
 		_:
 			print("[代理·%s] 收到不认识的事：%s" % [floor_id, event])
+
+
+## 锁口插满三个孔之后往上报的一句话。
+## 【为什么开哪扇门由这里决定，不由锁口决定】
+##   锁口不该知道门叫什么名字，就像门不该知道推它的人叫什么。
+##   这一层才有那本「谁是谁」的账（_doors），所以这一句只能在这里落地。
+func _处理解锁(data: Dictionary) -> void:
+	var 门号: String = str(data.get("门", ""))
+	print("[代理·%s] 收到：%s 插满了 → 开「%s」" % [
+		floor_id, data.get("锁口", "?"), 门号])
+	var d: Node = _doors.get(门号, null)
+	if d == null:
+		push_error("[代理·%s] 锁口说开「%s」，但这一层没有这扇门" % [floor_id, 门号])
+		return
+	if d.has_method("被解锁"):
+		d.被解锁()
 
 
 ## 角色只说了「我在这一层碰了东西，按的是这个键」，剩下全靠这里认。
@@ -85,6 +166,18 @@ func _处理交互(data: Dictionary) -> void:
 			if area.is_in_group("usable_item"):
 				if 谁.收起道具(area):
 					print("[代理·%s] 判定：是道具 → %s 收进了道具格" % [floor_id, 谁.name])
+				return
+		return
+
+	if 键 == "insert_key":
+		# 锁口的分身（Area2D「Zone」）在 keyhole 组里，锁口本体是它的父节点。
+		# 这里只负责「认出来并递过去」，插多久、对不对孔、门开不开都不在这里（见 锁口.gd）
+		for area in 碰到:
+			if area.is_in_group("keyhole"):
+				var lock: Node = area.get_parent()
+				if lock != null and lock.has_method("插"):
+					print("[代理·%s] 判定：是锁口 → 交给锁口自己读" % floor_id)
+					lock.插(谁)
 				return
 		return
 
