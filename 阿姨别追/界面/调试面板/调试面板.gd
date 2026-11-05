@@ -75,11 +75,11 @@ func _点选角色(屏幕点: Vector2) -> void:
 		var body: Node = one.get("collider")
 		if body == null:
 			continue
-		# 正被宿管扛在肩上的学生：切过去也没法操作（他的位置每帧由宿管摆），
-		# 所以直接说一句，不切。这不是限制，是省得你以为按键失灵了。
+		# 正被宿管扛在肩上的学生：**照样能切**（「点谁控谁」就得一个不漏），
+		# 但先说一句，免得你以为按键失灵了 —— 扛着的时候位置每帧由宿管摆，
+		# 学生脚本在这期间直接返回，不吃键盘，所以切过去只能看着，动不了。
 		if body.get("被扛着") == true:
-			print("[调试] %s 正被扛着，先放下再切过去" % body.name)
-			return
+			print("[调试] %s 正被宿管扛着，切过去只能看着（放下后才能操作）" % body.name)
 		# 不是可控制角色（比如箱子落地的 StaticBody2D）就继续往上找
 		if Director.set_control(body):
 			get_viewport().set_input_as_handled()

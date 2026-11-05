@@ -102,6 +102,16 @@ func _ready() -> void:
 	$ClimbZone.area_exited.connect(_on_climb_exit)
 	# 向总管报到：我可以被玩家控制。学生先出生，所以默认控制权默认在他身上
 	Director.register_controllable(self)
+	# 场上不止一个学生之后（2026-11-05 加了 student2），道具格是全场共用的一个格子，
+	# 谁最后广播就显示谁的。所以「换成我操作」时要主动把**我身上的道具**再喊一遍，
+	# 不然点回自己，右下角还挂着上一个人捡的东西。
+	Director.control_changed.connect(_on_control_changed)
+
+func _on_control_changed(who: Node) -> void:
+	if who == self:
+		# 延后一帧再喊：换人时 HUD 会先把格子清空（见 道具格.gd），
+		# 我这一嗓子必须在它清完之后到，否则刚补上又被清掉。
+		_refresh_item_slot.call_deferred()
 
 func _on_climb_enter(_area: Area2D) -> void:
 	_on_ladder = true   # 碰到梯子（还不算挂着，要看有没有按上下键）

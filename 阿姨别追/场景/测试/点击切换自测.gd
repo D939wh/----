@@ -82,6 +82,83 @@ func _ready() -> void:
 	var 反算: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * 屏幕点
 	结果["⑨ 屏幕↔世界往返"] = "%.0f,%.0f → %.0f,%.0f" % [目标世界点.x, 目标世界点.y, 反算.x, 反算.y]
 
+	# ── 被调试面板挡住的那块屏幕，也要点得中 ──
+	# 为什么单列一条：面板是 Control，Godot 里 Control 默认会「吃掉」落在它范围内的鼠标事件，
+	# 事件到不了 _unhandled_input，表现就是「人走到左上角就点不动了」，而且不报错。
+	# 必须把面板和它的字都设成 mouse_filter=2（忽略），点击才能穿过去。
+	Director.set_control(学生2)
+	await _等(0.05)
+	var 面板 := 主场景.get_node("DebugPanel/面板") as Control
+	var 面板内世界点: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * Vector2(160, 90)
+	学生1.global_position = 面板内世界点
+	await _等(0.15)
+	_对准相机()
+	var 面板前 := Director.当前控制.name
+	_点(学生1)   # 身体中心仍落在面板范围内（面板占屏幕 12~340 × 12~172）
+	await _等(0.15)
+	结果["⑩ 面板挡着也点得中"] = "%s → %s（面板 mouse_filter=%d，2=忽略）" % [
+		面板前, Director.当前控制.name, 面板.mouse_filter
+	]
+
+	# ── 点完不是只改了个变量：键盘要真的跟着换人 ──
+	# 只验证 Director.当前控制 变了是不够的 —— 万一角色脚本里的「我受不受控」判断写错，
+	# 会出现「显示换了人，按键还在动上一个人」。所以这里真按一下右方向键，看谁动。
+	Director.set_control(学生1)
+	学生2.拉起()   # ⑥ 把她打瘫了，这里先扶起来，不然「按右键不动」是瘫痪造成的，不是切换没生效
+	学生1.global_position = Vector2(700, 178)
+	学生2.global_position = Vector2(800, 178)
+	await _等(0.25)
+	_对准相机()
+	_点(学生2)
+	await _等(0.1)
+	var 学1前: float = 学生1.global_position.x
+	var 学2前: float = 学生2.global_position.x
+	Input.action_press("right")
+	await _等(0.3)
+	Input.action_release("right")
+	await _等(0.1)
+	结果["⑪ 点完真接管键盘"] = "学生1 位移 %.1f（应≈0）/ 学生2 位移 %.1f（应>0）" % [
+		学生1.global_position.x - 学1前, 学生2.global_position.x - 学2前
+	]
+
+	# ── 换人后右下角道具格要跟着换（两个学生共用一个格子）──
+	# 不加这条会怎样：学生1 捡了东西，点学生2 时右下角还挂着学生1 的图标，
+	# 看着像是「学生2 手上有东西」，演示时最容易被当成 bug。
+	var 道具格 := 主场景.get_node("HUD/HUDRoot/ItemSlot") as Control
+	Director.set_control(学生1)
+	await _等(0.05)
+	学生1.收起道具(主场景.get_node("UsableItem"))
+	await _等(0.1)
+	var 学1显示: bool = 道具格.visible
+	Director.set_control(学生2)
+	await _等(0.1)
+	var 学2显示: bool = 道具格.visible
+	Director.set_control(学生1)
+	await _等(0.1)
+	结果["⑫ 道具格跟着换人"] = "学生1 有道具→%s / 切学生2→%s / 切回学生1→%s" % [
+		学1显示, 学2显示, 道具格.visible
+	]
+
+	# ── 切到宿管：她手上没有道具，格子得空着 ──
+	# 不清的话，学生1 的道具图标会一直挂在她身上，看着像「宿管揣着学生的东西」。
+	Director.set_control(宿管)
+	await _等(0.15)
+	结果["⑬ 切宿管格子清空"] = "显示=%s（应 false）" % 道具格.visible
+
+	# ── 被扛在肩上的学生：点不中（碰撞体是故意关掉的）──
+	# 这条不是「功能」，是**把限制钉成事实**：被扛起时学生会关掉碰撞体（不然会挤飞宿管），
+	# 关掉之后物理点查询就打不到他。面板里那段「被扛着也允许切」的分支，
+	# 正常情况下走不到——写出来是为了万一将来换成查 sprite 命中也别切错。
+	Director.set_control(宿管)
+	学生2.被扛起(宿管)
+	await _等(0.15)
+	_对准相机()
+	var 扛前 := Director.当前控制.name
+	_点(学生2)
+	await _等(0.15)
+	结果["⑭ 扛着的人点不中"] = "%s → %s（碰撞已禁，应不变）" % [扛前, Director.当前控制.name]
+	学生2.被放下(主场景)
+
 	_打印()
 	get_tree().quit()
 
