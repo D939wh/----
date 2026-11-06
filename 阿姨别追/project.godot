@@ -34,10 +34,10 @@ enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg", "res://addons/godo
 
 folder_colors={
 "res://交互物/": "blue",
-"res://交互物/门/": "blue",
+"res://交互物/出口/": "blue",
 "res://交互物/钥匙板/": "blue",
 "res://交互物/锁口/": "blue",
-"res://交互物/出口/": "blue",
+"res://交互物/门/": "blue",
 "res://单例/": "green",
 "res://参考资料/": "gray",
 "res://场景/": "yellow",
@@ -45,9 +45,9 @@ folder_colors={
 "res://场景/测试/": "teal",
 "res://数据/": "amber",
 "res://界面/": "pink",
+"res://界面/读条/": "pink",
 "res://界面/调试面板/": "gray",
 "res://界面/道具格/": "pink",
-"res://界面/读条/": "pink",
 "res://素材/": "red",
 "res://角色/": "orange",
 "res://角色/学生/": "yellow",
