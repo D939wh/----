@@ -45,7 +45,7 @@ folder_colors={
 "res://单例/": "green",
 "res://参考资料/": "gray",
 "res://场景/": "yellow",
-"res://场景/楼层代理/": "teal",
+"res://场景/物件代理/": "teal",
 "res://场景/测试/": "teal",
 "res://数据/": "amber",
 "res://数据/正式/": "amber",
