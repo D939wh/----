@@ -45,8 +45,8 @@ folder_colors={
 "res://单例/": "green",
 "res://参考资料/": "gray",
 "res://场景/": "yellow",
-"res://场景/物件代理/": "teal",
 "res://场景/测试/": "teal",
+"res://场景/物件代理/": "teal",
 "res://数据/": "amber",
 "res://数据/正式/": "amber",
 "res://数据/测试/": "gray",
@@ -55,8 +55,11 @@ folder_colors={
 "res://界面/调试面板/": "gray",
 "res://界面/道具格/": "pink",
 "res://素材/": "red",
+"res://组件/": "green",
+"res://组件/状态机/": "green",
 "res://角色/": "orange",
 "res://角色/学生/": "yellow",
+"res://角色/学生/状态/": "yellow",
 "res://角色/宿管/": "purple",
 "res://调试工具/": "gray"
 }

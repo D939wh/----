@@ -1,8 +1,7 @@
 extends Node
-## 钥匙板 + 锁口自测（2026-11-05 通关线路的第一段）
+## 钥匙板 + 锁口自测
 ##
-## 验的是什么：照「猫和老鼠搬奶酪塞洞口」那套搬进我们的三层架构之后，
-## 这一整条链路到底通不通：
+## 验的是这一整条链路通不通：
 ##
 ##   学生扛起钥匙板 → 走到锁口前按 R → 代理认出来 → 锁口自己读 2 秒
 ##   → 插上、孔亮、人空手 → 三块插满 → 锁口往上报 → 代理开门
@@ -34,7 +33,7 @@ func _ready() -> void:
 
 	var s: CharacterBody2D = scene.get_node("student")
 	scene.get_node("student2").global_position = Vector2(1800, 178)  # 挪远，别混进感应区
-	# 2026-11-06 按编号重构：全部改成拿编号向总管要，不再翻代理的内部字典
+	# 全部拿编号向总管要，不翻代理的内部字典
 	var 锁口: Node = Director.thing("1-门厅")
 	var 东门: Node = Director.thing("1-走廊东")
 	var 一号: Node = Director.thing("一号")

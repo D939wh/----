@@ -1,0 +1,15 @@
+extends "res://组件/状态机/状态.gd"
+## 插钥匙中 —— 站在锁孔前那几秒，人钉在原地。
+##
+## 由锁口调用 `钉住(true)` 进入，`钉住(false)` 退出。
+## 本状态不吃键盘、不跳跃、不攀爬，但重力照常。
+
+func 每帧(delta: float) -> void:
+	var h = host
+	# 不吃键盘、不能跳、不能爬；但重力照常 —— 脚下的地要是没了，该掉还是得掉
+	h.velocity.x = 0.0
+	if not h.is_on_floor():
+		h.velocity.y += h.GRAVITY * delta
+	else:
+		h.velocity.y = 0.0
+	h.move_and_slide()
