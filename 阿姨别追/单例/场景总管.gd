@@ -22,13 +22,24 @@ signal door_finished(floor_id: String, door_id: String, is_open: bool)
 ## 楼层号 -> 代理节点
 var _floors: Dictionary = {}
 
+## 楼层号 -> 层带 Vector2(上界 y, 下界 y)。判层用，代理登记时一起交上来
+##   上界 = 这一层最高的地方（y 更小），下界 = 这一层最低的地方（y 更大）
+##   为什么带在数据里、不在这里算：地图是手画的，层高不齐（160/192 都有），
+##   脚本里写死任何一个数，改地图就得改代码 —— 这是铁律五的反面教材。
+var _bands: Dictionary = {}
+
 
 ## 楼层出生时来报到。同名楼层重复报到会报警（说明有两层撞了名字）
-func register_floor(floor_id: String, agent: Node) -> void:
+##
+## 【层带】（2026-11-06 加）不填 = 这一层占满全图（老的单层地图不用改）。
+##   多层地图必须填：总管靠它回答「这个人在第几层」（floor_of）。
+func register_floor(floor_id: String, agent: Node, 层带: Vector2 = Vector2(-1.0e12, 1.0e12)) -> void:
 	if _floors.has(floor_id):
 		push_warning("[总管] 楼层重名，后来的会顶掉前面的：" + floor_id)
 	_floors[floor_id] = agent
-	print("[总管] 楼层登记：%s（现在共 %d 层）" % [floor_id, _floors.size()])
+	_bands[floor_id] = 层带
+	print("[总管] 楼层登记：%s（层带 y %.0f..%.0f，现在共 %d 层）" % [
+		floor_id, 层带.x, 层带.y, _floors.size()])
 
 
 ## 拿某一层的代理。没有就返回 null
@@ -55,11 +66,54 @@ func report(floor_id: String, event: String, data: Dictionary = {}) -> bool:
 
 
 ## 给学生之类的角色用：我在哪个楼层？
-## 先按 y 坐标粗判——W2 只有一层，先返回唯一那层
-func floor_of(_node: Node) -> String:
+##
+## 【2026-11-06 改】以前这里写的是「只有一层就先返回那一层」——多层时永远返回空串，
+##   交互全都递不出去。现在按「层带」查：人在哪条带里，就是哪一层。
+##
+## 【为什么不是「按 y 找脚下最近的那条地面线」】
+##   那张手绘地图每层由 3~4 段错开 16 像素的台阶拼成，层距 160~192 像素，
+##   台阶和层距差一个数量级 —— 用「最近地面线」判，站在台阶上就会判到隔壁层去。
+##   层带是**每层自己声明的范围**（数据），不是算出来的（猜测）。
+##   地图以后怎么改，改的是清单里那两个数，这个函数一个字不用动。
+##
+## 【掉在两层之间的空中怎么办】
+##   挑最近的那一层。宁可给一个「八成对」的答案，也不要返回空串让交互静默失败 ——
+##   静默失败最难查。
+func floor_of(node: Node) -> String:
+	if node == null or not is_instance_valid(node):
+		return ""
 	if _floors.size() == 1:
 		return _floors.keys()[0]
-	return ""
+	if not (node is Node2D):
+		return ""
+
+	var y: float = (node as Node2D).global_position.y
+
+	# 1) 先找带：直接命中
+	for id in _floors:
+		var 带: Vector2 = _bands.get(id, Vector2(-1.0e12, 1.0e12))
+		if y >= 带.x and y < 带.y:
+			return id
+
+	# 2) 不在任何带里（空中、或者地图外的坐标）：挑最近的那层
+	var 最近 := ""
+	var 最近距离 := INF
+	for id in _floors:
+		var 带: Vector2 = _bands.get(id, Vector2(-1.0e12, 1.0e12))
+		var 距离 := 0.0
+		if y < 带.x:
+			距离 = 带.x - y
+		elif y >= 带.y:
+			距离 = y - 带.y
+		if 距离 < 最近距离:
+			最近距离 = 距离
+			最近 = id
+	return 最近
+
+
+## 调试用：这一层登记的层带是多少
+func band_of(floor_id: String) -> Vector2:
+	return _bands.get(floor_id, Vector2(-1.0e12, 1.0e12))
 
 
 ## 调试用：把当前登记了哪几层打出来

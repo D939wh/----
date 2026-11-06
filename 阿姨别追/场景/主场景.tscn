@@ -41,3 +41,4 @@ position = Vector2(1500, 178)
 
 [node name="FloorAgent" type="Node2D" parent="." unique_id=1978380786]
 script = ExtResource("7_agent")
+floor_list_path = "res://数据/测试/楼层清单_旧一楼.gd"

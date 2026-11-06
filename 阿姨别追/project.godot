@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="阿姨别追"
-run/main_scene="uid://b35p4a3rfl3yk"
+run/main_scene="res://场景/主场景2.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://素材/角色参考/icon.svg"
 
@@ -38,12 +38,18 @@ folder_colors={
 "res://交互物/钥匙板/": "blue",
 "res://交互物/锁口/": "blue",
 "res://交互物/门/": "blue",
+"res://交互物/梯子/": "blue",
+"res://交互物/检修口/": "blue",
+"res://交互物/可搬运箱子/": "blue",
+"res://交互物/可使用物品/": "blue",
 "res://单例/": "green",
 "res://参考资料/": "gray",
 "res://场景/": "yellow",
 "res://场景/楼层代理/": "teal",
 "res://场景/测试/": "teal",
 "res://数据/": "amber",
+"res://数据/正式/": "amber",
+"res://数据/测试/": "gray",
 "res://界面/": "pink",
 "res://界面/读条/": "pink",
 "res://界面/调试面板/": "gray",

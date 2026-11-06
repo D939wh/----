@@ -10,6 +10,8 @@ collision_layer = 4
 collision_mask = 0
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(0, 8)
+scale = Vector2(0.158416, 0.9494)
 texture = ExtResource("1_lad")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
