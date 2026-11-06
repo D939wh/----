@@ -27,7 +27,7 @@ func _ready() -> void:
 	await _w(1.3)
 	await _tap("interaction")
 	await _w(0.2)
-	r["1_打瘫"] = "血量 %d / 瘫痪 %s / 碰撞层 %d（应 2）" % [s.血量, s.瘫痪, s.collision_layer]
+	r["1_打瘫"] = "血量 %d / 瘫痪 %s / 碰撞层 %d（应 4 = 第 3 层「瘫痪」）" % [s.血量, s.瘫痪, s.collision_layer]
 
 	# 先验证「瘫痪不挡路」：等挥击后摇过去，宿管从 900 往右走 0.5 秒应越过 960
 	await _w(0.9)   # 后摇 0.8 秒，等它走完
@@ -60,7 +60,7 @@ func _ready() -> void:
 	Input.action_release("right")
 	r["5_切回能走"] = "位移 %.0f（应 >60，扛人 222 速）" % (k.global_position.x - x1)
 
-	# 放下 → 学生落回地面、还瘫着、碰撞层仍是 2
+	# 放下 → 学生落回地面、还瘫着、碰撞层仍是第 3 层「瘫痪」（位掩码 4）
 	await _tap("grab")
 	await _w(0.4)
 	r["6_放下"] = "空肩=%s / 还瘫痪=%s / 父节点=%s / 层 %d" % [

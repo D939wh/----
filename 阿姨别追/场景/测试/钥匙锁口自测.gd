@@ -8,9 +8,9 @@ extends Node
 ##   → 插上、孔亮、人空手 → 三块插满 → 锁口往上报 → 代理开门
 ##
 ## 每一环都要看得见证据，不是"跑一下没报错"：
-##   [代理·一楼] 判定：是锁口 → 交给锁口自己读
+##   [锁口] 1-门厅 开始插「一号」（2.0 秒）   ← 编号把 R 递到了锁口
 ##   [锁口] 1-门厅 开始插「一号」（2.0 秒）
-##   [代理·一楼] 收到：1-门厅 插满了 → 开「1-走廊东」
+##   [门] 1-走廊东 收到「1-门厅」插满了      ← 按编号递到了门
 ##   [门] 1-走廊东 被解锁，弹开了
 ##
 ## 用法：
@@ -34,12 +34,12 @@ func _ready() -> void:
 
 	var s: CharacterBody2D = scene.get_node("student")
 	scene.get_node("student2").global_position = Vector2(1800, 178)  # 挪远，别混进感应区
-	var agent: Node = scene.get_node("FloorAgent")
-	var 锁口: Node = agent._locks.get("1-门厅", null)
-	var 东门: Node = agent.get_door("1-走廊东")
-	var 一号: Node = agent._keys.get("一号", null)
-	var 二号: Node = agent._keys.get("二号", null)
-	var 三号: Node = agent._keys.get("三号", null)
+	# 2026-11-06 按编号重构：全部改成拿编号向总管要，不再翻代理的内部字典
+	var 锁口: Node = Director.thing("1-门厅")
+	var 东门: Node = Director.thing("1-走廊东")
+	var 一号: Node = Director.thing("一号")
+	var 二号: Node = Director.thing("二号")
+	var 三号: Node = Director.thing("三号")
 
 	# ── ① 代理照清单把东西都摆出来了 ──
 	_记("① 三块钥匙板都建出来了",
@@ -139,7 +139,7 @@ func _ready() -> void:
 	_记("⑧ 门现在不挡路", 东门._blocker.disabled)
 
 	# ── ⑨ 门开了，站门口 1 秒算逃出去 ──
-	var 出口: Node = agent._exits.get("1-门厅出口", null)
+	var 出口: Node = Director.thing("1-门厅出口")
 	_记("⑨ 出口建出来了", 出口 != null)
 	if 出口 != null:
 		var 提示: Label = 出口.get_node("HUD/提示")

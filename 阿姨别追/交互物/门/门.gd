@@ -24,10 +24,24 @@ extends Node2D
 ##   现在：这扇门的用时只有清单一个来源。代理没把用时传进来就是配置错了，
 ##   报错、不偷偷兜底 —— 悄悄用默认值，等于让错误永远看不见。
 
-var floor_id: String = ""
-var door_id: String = ""
+## 这扇门的身份证（"1-走廊东" 这种）。由物件代理照清单盖章，或在检查器里手填。
+## **全工程不许重号** —— 总管拿它当唯一键。
+## 身份证（编号）。**必须用英文名导出** —— 中文名的导出属性在 `.tscn` 里赋值会
+## **静默失效**（2026-11-06 实测：`.tscn` 里明明写着 `编号 = "1-箱子"`，运行时读出来是空串，
+## 属性表里那一项也在，就是不生效）。所以编辑器里填 `thing_id`，代码里读 `编号`。
+@export var thing_id: String = ""
 
-## 这扇门自己的开门用时。由楼层代理照清单填进来
+## 中文别名：全工程代码统一用「编号」读写，和 `thing_id` 是同一个值
+var 编号: String:
+	get:
+		return thing_id
+	set(值):
+		thing_id = 值
+
+## 交互优先级：同一位置挤着好几件东西时，数字大的先问（门是 0，箱子是 10）
+@export var 互动优先级: int = 0
+
+## 这扇门自己的开门用时。由物件代理照清单填进来
 ## 空字典 = 还没填（= 配置漏了），用的时候 `_time_needed()` 会 push_error
 var _开门用时: Dictionary = {}
 
@@ -40,10 +54,8 @@ var _blocked: bool = true       # 当前碰撞体是不是挡着路
 @onready var _blocker: CollisionShape2D = $Blocker/CollisionShape2D
 
 
-## 由楼层代理按清单调用：告诉它自己是哪层、哪扇、站哪、开门要几秒
-func setup(f: String, id: String, pos: Vector2, 用时: Dictionary = {}) -> void:
-	floor_id = f
-	door_id = id
+## 由物件代理按清单调用：站哪、开门要几秒。（编号由代理在 add_child 前盖好）
+func setup(pos: Vector2, 用时: Dictionary = {}) -> void:
 	position = pos
 	if not 用时.is_empty():
 		_开门用时 = 用时.duplicate()
@@ -51,6 +63,8 @@ func setup(f: String, id: String, pos: Vector2, 用时: Dictionary = {}) -> void
 
 func _ready() -> void:
 	_apply()
+	# 报到：从这一刻起，总管拿编号就能找到这扇门
+	Director.register_thing(编号, self)
 
 
 ## 有人按了 E（求生者）或要开关门（宿管）。谁按，谁接管。
@@ -63,11 +77,32 @@ func _ready() -> void:
 func press(who: Node) -> void:
 	_user = who
 	_target = 0.0 if _target > 0.5 else 1.0
-	Director.report(floor_id, "door_pressed", { "door_id": door_id, "by": who })
-	Director.door_pressed.emit(floor_id, door_id, who)
+	Director.door_pressed.emit(编号, who)
 
 
-## 被解锁：三个锁孔插满时，由楼层代理替门喊这一句（2026-11-05）
+## 按键进来：只认「开门」这一个键，其余不归我管（返回 false，让别人接着问）
+##
+## 【为什么这个函数长在门身上】学生不认识门，它只说「我按了 E，我碰到了编号 X」。
+##   是不是归这扇门办、按了要干什么，门自己最清楚。以后加灯、加柜子，
+##   各自实现这一个函数就行，总管和代理一个字不用改。
+func 被按键(键: String, 谁: Node) -> bool:
+	if 键 != "open_door":
+		return false
+	press(谁)
+	return true
+
+
+## 收到一件事（总管按编号递过来的）。现在只认「解锁」这一件
+##
+## 【为什么这句话让门自己办】锁口只说「插满了」，谁该开、怎么开，门自己最清楚。
+##   以后加「电闸箱供电才能开」这种规矩，也只改这里，锁口一个字不用动。
+func on_report(event: String, data: Dictionary) -> void:
+	if event == "unlock":
+		print("[门] %s 收到「%s」插满了" % [编号, data.get("锁口", "?")])
+		被解锁()
+
+
+## 被解锁：三个锁孔插满时，总管按编号把话递到这里（2026-11-05，11-06 改成按编号）
 ##
 ## 【为什么不用 press()】
 ##   press 是「谁在推门」，要记是谁推的、按那个人的速度慢慢开。
@@ -78,8 +113,8 @@ func 被解锁() -> void:
 	_amount = 1.0
 	_target = 1.0
 	_apply()                                   # 门板藏掉、碰撞体撤掉，人能过
-	Director.door_finished.emit(floor_id, door_id, true)
-	print("[门] %s 被解锁，弹开了" % door_id)
+	Director.door_finished.emit(编号, true)
+	print("[门] %s 被解锁，弹开了" % 编号)
 
 
 func _process(delta: float) -> void:
@@ -89,9 +124,9 @@ func _process(delta: float) -> void:
 	_apply()
 	if is_equal_approx(_amount, _target):
 		var is_open := _target > 0.5
-		Director.door_finished.emit(floor_id, door_id, is_open)
+		Director.door_finished.emit(编号, is_open)
 		print("[门] %s %s（%s 推的）" % [
-			door_id,
+			编号,
 			"已打开" if is_open else "已关上",
 			"宿管" if _is_keeper(_user) else "求生者",
 		])
@@ -105,7 +140,7 @@ func _process(delta: float) -> void:
 func _time_needed(who: Node) -> float:
 	var 谁 := "宿管" if _is_keeper(who) else "求生者"
 	if not _开门用时.has(谁):
-		push_error("[门] %s 没拿到开门用时，检查它是不是经过楼层代理建的" % door_id)
+		push_error("[门] %s 没拿到开门用时，检查清单里这件东西是不是经过物件代理建的" % 编号)
 		return 1.0   # 明显不合理的值：看得见、好定位，不是"正常速度"
 	return float(_开门用时[谁])
 

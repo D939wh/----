@@ -1,13 +1,15 @@
-[gd_scene format=3 uid="uid://dp6g075u2il3h"]
+[gd_scene load_steps=2 format=3 uid="uid://dp6g075u2il3h"]
 
 [ext_resource type="Texture2D" uid="uid://jeg5w34hsggt" path="res://素材/道具/钥匙/钥匙_占位.png" id="1_28th4"]
+[ext_resource type="Script" path="res://交互物/可使用物品/可使用物品.gd" id="2_item"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_mrg2g"]
 size = Vector2(26, 16)
 
 [node name="UsableItem" type="Area2D" unique_id=1396500502 groups=["usable_item"]]
-collision_layer = 8
+collision_layer = 16
 collision_mask = 0
+script = ExtResource("2_item")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=1599256823]
 texture = ExtResource("1_28th4")

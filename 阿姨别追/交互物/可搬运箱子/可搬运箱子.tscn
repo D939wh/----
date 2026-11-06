@@ -7,7 +7,7 @@
 size = Vector2(18, 18)
 
 [node name="CarryableBox" type="Area2D" unique_id=265815722 groups=["carryable"]]
-collision_layer = 8
+collision_layer = 16
 collision_mask = 0
 script = ExtResource("2_box")
 

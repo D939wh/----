@@ -12,9 +12,30 @@ extends Area2D
 
 @export var 重量: float = 80.0
 
+## 这件东西的身份证（"1-箱子" 这种）。由物件代理照清单盖章，或在检查器里手填。
+## 空编号 = 谁都找不到它 —— 学生按 F 也扛不起来，只会打一句警告。
+## 身份证（编号）。**必须用英文名导出** —— 中文名的导出属性在 `.tscn` 里赋值会
+## **静默失效**（2026-11-06 实测：`.tscn` 里明明写着 `编号 = "1-箱子"`，运行时读出来是空串，
+## 属性表里那一项也在，就是不生效）。所以编辑器里填 `thing_id`，代码里读 `编号`。
+@export var thing_id: String = ""
+
+## 中文别名：全工程代码统一用「编号」读写，和 `thing_id` 是同一个值
+var 编号: String:
+	get:
+		return thing_id
+	set(值):
+		thing_id = 值
+
+## 交互优先级：同一位置挤着好几件东西时，数字大的先问。
+## 箱子 10 > 道具 0 —— 站在箱子和道具中间按 F，先搬箱子（11-05 定的行为）
+@export var 互动优先级: int = 10
+
 const 下落重力: float = 900.0      # 像素/秒²。死物掉得比人干脆，别在空中飘
 const 最大下落速度: float = 700.0  # 再快也不会穿地：一帧最多 700/60 ≈ 12px < 一格 16px
 const 地面层: int = 1              # 地图 TileMapLayer 在第 1 层
+
+## 已经插进锁孔了？插上之后这东西就不该再被扛起来（钥匙板才用得上，箱子永远 false）
+var 已插: bool = false
 
 var 被扛着: bool = false            # 学生拿起时置 true、放下置 false
 var _下落速度: float = 0.0
@@ -26,6 +47,22 @@ var _复查倒计时: float = 0.0        # 站住之后多久再看一眼脚下�
 func _ready() -> void:
 	_底半高 = _量底半高()
 	set_physics_process(not 被扛着)
+	Director.register_thing(编号, self)
+
+
+## 按键进来：有人要搬我。接不接是这一件东西自己的事
+##
+## 【为什么由箱子自己判断】学生只知道「我按了 F，我碰到编号 X」，
+##   它不认识箱子、也不该认识。是箱子说「这键归我」，人才被喊去扛。
+func 被按键(键: String, 谁: Node) -> bool:
+	if 键 != "interaction":
+		return false
+	if 已插:
+		return false   # 已经焊在锁孔上的板子不该再被扛走
+	if 谁 == null or not is_instance_valid(谁) or not 谁.has_method("扛起"):
+		return false
+	谁.扛起(self)
+	return true
 
 
 ## 学生拿起/放下时调用。扛着的时候不跑重力，不然它会在人手里往下掉

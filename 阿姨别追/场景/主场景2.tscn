@@ -6,9 +6,9 @@
 [ext_resource type="PackedScene" uid="uid://dp6g075u2il3h" path="res://交互物/可使用物品/可使用物品.tscn" id="4_item"]
 [ext_resource type="PackedScene" uid="uid://doyrhatbglu8e" path="res://交互物/可搬运箱子/可搬运箱子.tscn" id="5_box"]
 [ext_resource type="PackedScene" path="res://界面/道具格/道具格.tscn" id="6_hud"]
-[ext_resource type="Script" uid="uid://pomh1n5mlmpq" path="res://场景/楼层代理/楼层代理.gd" id="7_agent"]
 [ext_resource type="PackedScene" path="res://角色/宿管/宿管.tscn" id="8_keeper"]
 [ext_resource type="PackedScene" path="res://界面/调试面板/调试面板.tscn" id="9_dbg"]
+[ext_resource type="Script" path="res://场景/物件代理/物件代理.gd" id="7_agent"]
 
 [node name="主场景2" type="Node2D"]
 
@@ -36,30 +36,16 @@ position = Vector2(-712, 432)
 
 [node name="CarryableBox" parent="." instance=ExtResource("5_box")]
 position = Vector2(328, 408)
+thing_id = "1-箱子"
 
 [node name="UsableItem" parent="." instance=ExtResource("4_item")]
 position = Vector2(488, 104)
+thing_id = "1-道具"
 
 [node name="HUD" parent="." instance=ExtResource("6_hud")]
 
 [node name="DebugPanel" parent="." instance=ExtResource("9_dbg")]
 
-[node name="四楼" type="Node2D" parent="."]
+[node name="ObjectAgent" type="Node2D" parent="."]
 script = ExtResource("7_agent")
-floor_id = "四楼"
-floor_list_path = "res://数据/正式/楼层清单.gd"
-
-[node name="三楼" type="Node2D" parent="."]
-script = ExtResource("7_agent")
-floor_id = "三楼"
-floor_list_path = "res://数据/正式/楼层清单.gd"
-
-[node name="二楼" type="Node2D" parent="."]
-script = ExtResource("7_agent")
-floor_id = "二楼"
-floor_list_path = "res://数据/正式/楼层清单.gd"
-
-[node name="一楼" type="Node2D" parent="."]
-script = ExtResource("7_agent")
-floor_id = "一楼"
-floor_list_path = "res://数据/正式/楼层清单.gd"
+list_path = "res://数据/正式/物件清单.gd"

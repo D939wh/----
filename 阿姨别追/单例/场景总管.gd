@@ -2,123 +2,139 @@ extends Node
 ## 场景总管 —— 你那份《游戏流程》里写的「总体的全部管线（负责处理各个系统的信号）」
 ##
 ## 它自己不做任何事，只干三件：
-##   1. 登记：楼层出生时来报个到（register_floor）
-##   2. 上报：谁碰上什么事，跟总管说一句（report）
-##   3. 转发：总管把话递给对应楼层的代理（on_report）
+##   1. 登记：一件东西出生就来报个到，记下它的编号（register_thing）
+##   2. 上报：谁碰上什么事，跟总管说一句（交互 / report）
+##   3. 转发：按编号把话递给那件东西自己办（被按键 / on_report）
 ##
-## 这样做的好处：学生不用知道门在哪、灯在哪、这楼有几层。
-## 学生只管喊「我碰了东西」，由总管去找该负责的那一层。
+## 这样做的好处：学生不用知道门在哪、灯在哪、图上有几层。
+## 学生只管喊「我碰到了编号 X」，由总管把话递过去。
 
-## 门被按了。floor_id=哪层，door_id=哪扇，by=谁按的
+## 门被按了。编号=哪扇门，by=谁按的
 ## 这个信号本文件自己不 emit，是留给门（以后的灯、柜子）向全工程喊话的。
 ## 所以加下面那行，告诉编辑器「它没人用是正常的，别报红黄」。
 @warning_ignore("unused_signal")
-signal door_pressed(floor_id: String, door_id: String, by: Node)
+signal door_pressed(编号: String, by: Node)
 
 ## 门开完了或关完了。is_open=true 表示现在敞开着
 @warning_ignore("unused_signal")
-signal door_finished(floor_id: String, door_id: String, is_open: bool)
+signal door_finished(编号: String, is_open: bool)
 
-## 楼层号 -> 代理节点
-var _floors: Dictionary = {}
+# ============================================================
+# 编号账本（2026-11-06 按编号重构）
+# ------------------------------------------------------------
+# 全工程只有这一本账：**编号 → 节点**。
+# 谁想找哪件东西，拿编号来问；谁想让哪件东西办事，拿编号来递话。
+#
+# 【为什么不再按楼层】原来这里记的是「四楼 → 代理」，人按键前先要问
+#   「我在第几层」，而层是块会变的：地图一改高度，四层的层带全要重算，
+#   算错就静默把人判到隔壁层。按编号以后这个问题根本不用问 ——
+#   人只报「我碰到了编号 X」。
+# ============================================================
 
-## 楼层号 -> 层带 Vector2(上界 y, 下界 y)。判层用，代理登记时一起交上来
-##   上界 = 这一层最高的地方（y 更小），下界 = 这一层最低的地方（y 更大）
-##   为什么带在数据里、不在这里算：地图是手画的，层高不齐（160/192 都有），
-##   脚本里写死任何一个数，改地图就得改代码 —— 这是铁律五的反面教材。
-var _bands: Dictionary = {}
+## 编号 -> 节点
+var _things: Dictionary = {}
 
 
-## 楼层出生时来报到。同名楼层重复报到会报警（说明有两层撞了名字）
+## 一件东西出生时报到。**编号不许空、不许重**：
+##   空编号 → 它这辈子谁都找不到它，等于白摆；
+##   重编号 → 后来的顶掉前面的，被顶掉的那件静默失联，最难查。
+func register_thing(编号: String, 节点: Node) -> void:
+	if 编号.strip_edges() == "":
+		push_warning("[总管] 有东西没填编号，登记不上：%s（%s）" % [
+			节点.name, 节点.get_script().resource_path if 节点.get_script() else "?"])
+		return
+	if _things.has(编号) and _things[编号] != 节点:
+		push_warning("[总管] 编号重了：%s —— 后来的 %s 顶掉前面的 %s" % [
+			编号, 节点.name, _things[编号].name])
+	_things[编号] = 节点
+
+
+## 按编号拿节点。没有就返回 null
+func thing(编号: String) -> Node:
+	return _things.get(编号.strip_edges(), null)
+
+
+## 现在登记了多少件东西（调试/自测用）
+func thing_count() -> int:
+	return _things.size()
+
+
+## 角色按键时走这里。传进来的是**感应区**（一堆 Area2D），不是编号 ——
+## 编号由这里解析，所以学生和宿管两边的写法完全一样，谁都不用认识类型。
 ##
-## 【层带】（2026-11-06 加）不填 = 这一层占满全图（老的单层地图不用改）。
-##   多层地图必须填：总管靠它回答「这个人在第几层」（floor_of）。
-func register_floor(floor_id: String, agent: Node, 层带: Vector2 = Vector2(-1.0e12, 1.0e12)) -> void:
-	if _floors.has(floor_id):
-		push_warning("[总管] 楼层重名，后来的会顶掉前面的：" + floor_id)
-	_floors[floor_id] = agent
-	_bands[floor_id] = 层带
-	print("[总管] 楼层登记：%s（层带 y %.0f..%.0f，现在共 %d 层）" % [
-		floor_id, 层带.x, 层带.y, _floors.size()])
-
-
-## 拿某一层的代理。没有就返回 null
-func get_floor(floor_id: String) -> Node:
-	return _floors.get(floor_id, null)
-
-
-## 上报一件事。event 是事情的名字，data 是附带的数据
-## 例：Director.report("一楼", "interact", {"谁": self, "键": "open_door", "碰到": [...]})
+## 流程：感应区 → 往上找带编号的那件东西 → 去重 → 按「谁优先」排序
+##      → 一件一件问「这键归你吗」，第一件认了的就到此为止。
+## 一次按键只办一件事：不然站在箱子旁边按 F 会连道具一起收走。
 ##
-## 【为什么要有返回值】（2026-11-04 加）
-##   这个函数现在会回答一句「递到了没有」：true = 这一层登记过、话已经交给代理；
-##   false = 压根没这一层，话递不出去。
-##   角色不需要靠这个返回值做判断（它报完就不管了，现在也确实是忽略返回值的），
-##   但「递没递到」必须能问得出来——不然出了 bug 只能靠猜。
-##   以后要加提示音、要在联机里做「这层没人」的兜底，都从这里接。
-func report(floor_id: String, event: String, data: Dictionary = {}) -> bool:
-	var agent: Node = _floors.get(floor_id, null)
-	if agent == null:
-		push_warning("[总管] 没登记过这一层，话递不到：" + floor_id)
+## 【为什么解析放在这里】以前这份逻辑在学生脚本里，宿管要照抄一遍，
+##   两个角色的行为早晚会漂（一边认箱子、一边不认）。总管本来就要拿编号查账，
+##   顺手在这儿做完最合适：加一个角色，按键只写一行。
+func 交互(谁: Node, 键: String, 区们: Array) -> bool:
+	for 号 in _编号们(区们):
+		var 物: Node = thing(号)
+		if 物 == null:
+			continue
+		if 物.has_method("被按键") and 物.被按键(键, 谁):
+			return true
+	return false
+
+
+## 感应区 → 编号列表（去重，按互动优先级从高到低）
+##
+## 【为什么要往上找】门的感应区是挂在门身上的一块子 Area2D，编号盖在门本体上；
+##   箱子/道具本身就是 Area2D，一眼就是它自己。统一成「从这块区往上走，
+##   第一件报了编号的就是它」——两种都能认。
+func _编号们(区们: Array) -> Array:
+	var 候选: Array = []
+	for 区 in 区们:
+		var 物: Node = _带编号的(区)
+		if 物 == null:
+			continue
+		var 号 := str(物.get("编号"))
+		if 号 == "" or 候选.any(func(项): return 项[1] == 号):
+			continue    # 空编号 = 没盖章；同一件东西两块感应区只算一次
+		候选.append([_优先级(物), 号])
+	候选.sort_custom(func(a, b): return a[0] > b[0])
+	var 结果: Array = []
+	for 项 in 候选:
+		结果.append(项[1])
+	return 结果
+
+
+func _带编号的(区: Node) -> Node:
+	var 现在: Node = 区
+	while 现在 != null:
+		var 号 = 现在.get("编号")
+		if 号 != null and str(号) != "":
+			return 现在
+		现在 = 现在.get_parent()
+	return null
+
+
+## 优先级：没写这一栏的当 0（门 / 锁口 / 道具都是 0，箱子是 10）
+func _优先级(物: Node) -> int:
+	var 值 = 物.get("互动优先级")
+	return int(值) if 值 != null else 0
+
+
+## 上报一件事给某一件东西（编号点名）。event 是事情的名字，data 是附带数据。
+## 例：Director.report("1-门厅", "unlock", {"门": "1-走廊东"})
+##
+## 【为什么要有返回值】true = 找到了、话递到了；false = 没这件东西。
+##   角色不需要靠它做判断，但「递没递到」必须问得出来 —— 不然出 bug 只能靠猜。
+func report(编号: String, event: String, data: Dictionary = {}) -> bool:
+	var 物: Node = thing(编号)
+	if 物 == null:
+		push_warning("[总管] 没有这件东西，话递不到：" + str(编号))
 		return false
-	agent.on_report(event, data)
+	if 物.has_method("on_report"):
+		物.on_report(event, data)
 	return true
 
 
-## 给学生之类的角色用：我在哪个楼层？
-##
-## 【2026-11-06 改】以前这里写的是「只有一层就先返回那一层」——多层时永远返回空串，
-##   交互全都递不出去。现在按「层带」查：人在哪条带里，就是哪一层。
-##
-## 【为什么不是「按 y 找脚下最近的那条地面线」】
-##   那张手绘地图每层由 3~4 段错开 16 像素的台阶拼成，层距 160~192 像素，
-##   台阶和层距差一个数量级 —— 用「最近地面线」判，站在台阶上就会判到隔壁层去。
-##   层带是**每层自己声明的范围**（数据），不是算出来的（猜测）。
-##   地图以后怎么改，改的是清单里那两个数，这个函数一个字不用动。
-##
-## 【掉在两层之间的空中怎么办】
-##   挑最近的那一层。宁可给一个「八成对」的答案，也不要返回空串让交互静默失败 ——
-##   静默失败最难查。
-func floor_of(node: Node) -> String:
-	if node == null or not is_instance_valid(node):
-		return ""
-	if _floors.size() == 1:
-		return _floors.keys()[0]
-	if not (node is Node2D):
-		return ""
-
-	var y: float = (node as Node2D).global_position.y
-
-	# 1) 先找带：直接命中
-	for id in _floors:
-		var 带: Vector2 = _bands.get(id, Vector2(-1.0e12, 1.0e12))
-		if y >= 带.x and y < 带.y:
-			return id
-
-	# 2) 不在任何带里（空中、或者地图外的坐标）：挑最近的那层
-	var 最近 := ""
-	var 最近距离 := INF
-	for id in _floors:
-		var 带: Vector2 = _bands.get(id, Vector2(-1.0e12, 1.0e12))
-		var 距离 := 0.0
-		if y < 带.x:
-			距离 = 带.x - y
-		elif y >= 带.y:
-			距离 = y - 带.y
-		if 距离 < 最近距离:
-			最近距离 = 距离
-			最近 = id
-	return 最近
-
-
-## 调试用：这一层登记的层带是多少
-func band_of(floor_id: String) -> Vector2:
-	return _bands.get(floor_id, Vector2(-1.0e12, 1.0e12))
-
-
-## 调试用：把当前登记了哪几层打出来
+## 调试用：把当前登记了哪些编号打出来
 func dump() -> void:
-	print("[总管] 当前楼层表：", _floors.keys())
+	print("[总管] 当前登记的物件：", _things.keys())
 
 
 # ============================================================

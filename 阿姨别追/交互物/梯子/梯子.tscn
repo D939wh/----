@@ -1,13 +1,15 @@
 [gd_scene format=3 uid="uid://bu704p01xw1bj"]
 
 [ext_resource type="Texture2D" uid="uid://dvy6hofdvg3wj" path="res://素材/场景/梯子/梯子.png" id="1_lad"]
+[ext_resource type="Script" path="res://交互物/梯子/梯子.gd" id="2_script"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ladder"]
 size = Vector2(32, 300)
 
 [node name="Ladder" type="Area2D"]
-collision_layer = 4
+collision_layer = 8
 collision_mask = 0
+script = ExtResource("2_script")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 position = Vector2(0, 8)

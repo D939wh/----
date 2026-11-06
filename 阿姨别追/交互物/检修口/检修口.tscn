@@ -9,7 +9,7 @@ size = Vector2(32, 6)
 script = ExtResource("1_hatch")
 
 [node name="平台" type="StaticBody2D" parent="."]
-collision_layer = 16
+collision_layer = 2
 collision_mask = 0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="平台"]

@@ -3,7 +3,7 @@ extends Node2D
 ##
 ## 【这套写法是照谁抄的】
 ##   照「门」。门自己管「现在开到哪儿」，锁口自己管「插进去几块、这一块插到几成」。
-##   学生只说一句「我按了 R，我碰到了这些」，剩下全在楼层代理和这里。
+##   学生只说一句「我按了 R，我碰到了这些」，剩下全在总管和这里。
 ##   学生脚本里没有锁口、没有编号、没有「几秒」—— 加第四块钥匙、加第二个锁口，
 ##   学生一个字都不用改。
 ##
@@ -33,8 +33,21 @@ const 暗色 := Color(0.10, 0.10, 0.12, 1.0)
 ## 改这一个开关就退化，代码不用动。
 @export var 要求配对: bool = true
 
-var floor_id: String = ""
-var lock_id: String = ""
+## 这个锁口的身份证（"1-门厅" 这种）。由物件代理照清单盖章，或在检查器里手填
+## 身份证（编号）。**必须用英文名导出** —— 中文名的导出属性在 `.tscn` 里赋值会
+## **静默失效**（2026-11-06 实测：`.tscn` 里明明写着 `编号 = "1-箱子"`，运行时读出来是空串，
+## 属性表里那一项也在，就是不生效）。所以编辑器里填 `thing_id`，代码里读 `编号`。
+@export var thing_id: String = ""
+
+## 中文别名：全工程代码统一用「编号」读写，和 `thing_id` 是同一个值
+var 编号: String:
+	get:
+		return thing_id
+	set(值):
+		thing_id = 值
+
+## 交互优先级（同位置多件东西时数字大的先问；锁口和门都是 0）
+@export var 互动优先级: int = 0
 
 var _插孔用时: float = 2.0      # 由代理照这张图的清单填。0.1 基本等于按一下就进
 var _连哪扇门: String = ""      # 插满时开哪扇门（名字，不是节点）
@@ -52,6 +65,8 @@ var _读条: CanvasLayer = null
 
 
 func _ready() -> void:
+	# 报到：总管拿编号就能找到这个锁口（三孔插满时要按编号找门，也是靠这本账）
+	Director.register_thing(编号, self)
 	# 场景里固定摆着三个孔节点（孔1/孔2/孔3），这里把它们和编号对起来。
 	# 颜色从 `通用规则.gd` 取 —— 和钥匙板铁牌是同一份，不会出现「钥匙黄、孔红」。
 	var i := 0
@@ -67,13 +82,19 @@ func _ready() -> void:
 		i += 1
 
 
-## 由楼层代理按清单调用：哪层、哪个锁口、站哪、插一块要几秒、插满开哪扇门
-func setup(f: String, id: String, pos: Vector2, 用时: float, 门: String) -> void:
-	floor_id = f
-	lock_id = id
+## 由物件代理按清单调用：站哪、插一块要几秒、插满开哪扇门
+## （编号由代理在 add_child 之前盖好，见 物件代理.gd）
+func setup(pos: Vector2, 用时: float, 门: String) -> void:
 	position = pos
 	_插孔用时 = maxf(用时, 0.01)
 	_连哪扇门 = 门
+
+
+## 按键进来：只认「插钥匙」，其余不归我管
+func 被按键(键: String, 谁: Node) -> bool:
+	if 键 != "insert_key":
+		return false
+	return 插(谁)
 
 
 ## 有人按 R 想插钥匙。返回 true = 接下了（开始读条）
@@ -91,20 +112,20 @@ func 插(谁: Node) -> bool:
 	if 谁.has_method("手上扛着"):
 		货 = 谁.手上扛着()
 	if 货 == null:
-		print("[锁口] %s：空着手插不了" % lock_id)
+		print("[锁口] %s：空着手插不了" % 编号)
 		return false
 
 	var 号 := str(货.get("编号"))
 	if 号 == "":
-		print("[锁口] %s：扛的不是钥匙板" % lock_id)
+		print("[锁口] %s：扛的不是钥匙板" % 编号)
 		return false
 
 	var 孔号 := _选孔(号)
 	if 孔号 == "":
 		if _孔.has(号) and bool(_孔[号]["亮"]):
-			print("[锁口] %s：%s 的孔已经插过了，这门上没别的位置给它" % [lock_id, 号])
+			print("[锁口] %s：%s 的孔已经插过了，这门上没别的位置给它" % [编号, 号])
 		else:
-			print("[锁口] %s：这块是「%s」，这门上没这个孔" % [lock_id, 号])
+			print("[锁口] %s：这块是「%s」，这门上没这个孔" % [编号, 号])
 		return false
 
 	_进行中 = true
@@ -116,7 +137,7 @@ func 插(谁: Node) -> bool:
 		谁.钉住(true)          # 插的过程中人不能动
 	_读条 = 读条脚本.新建(self)
 	_读条.开始(谁, "插钥匙", _插孔用时)
-	print("[锁口] %s 开始插「%s」（%.1f 秒）" % [lock_id, 号, _插孔用时])
+	print("[锁口] %s 开始插「%s」（%.1f 秒）" % [编号, 号, _插孔用时])
 	return true
 
 
@@ -178,20 +199,23 @@ func _完成() -> void:
 	if 货 != null and is_instance_valid(货):
 		货.queue_free()
 
-	print("[锁口] %s 插上「%s」，%d/%d" % [lock_id, 孔号, _亮孔数(), _孔.size()])
+	print("[锁口] %s 插上「%s」，%d/%d" % [编号, 孔号, _亮孔数(), _孔.size()])
 
 	if _亮孔数() >= _孔.size() and _孔.size() > 0:
 		_全插满()
 
 
 func _全插满() -> void:
-	print("[锁口] %s 三个孔都插满了，喊门开" % lock_id)
-	# 往上只报一句，谁去开门是代理的事（锁口不认识门）
-	Director.report(floor_id, "unlock", { "锁口": lock_id, "门": _连哪扇门 })
+	print("[锁口] %s 三个孔都插满了，开「%s」" % [编号, _连哪扇门])
+	# 【谁去开】锁口不碰门这个节点，它只认清单里写的那串**编号**，
+	#   把「我插满了，你可以开了」按编号递给总管。总管查账、找到那扇门，
+	#   门自己决定怎么弹开（`门.gd` 的 on_report）。
+	#   门不在（清单名字写错）不许静默失败 —— report 会报红并返回 false。
+	Director.report(_连哪扇门, "unlock", { "锁口": 编号 })
 
 
 func _中断(原因: String) -> void:
-	print("[锁口] %s 插到一半断了：%s" % [lock_id, 原因])
+	print("[锁口] %s 插到一半断了：%s" % [编号, 原因])
 	_收场()
 
 

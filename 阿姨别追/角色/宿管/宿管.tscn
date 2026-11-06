@@ -24,7 +24,7 @@ size = Vector2(18, 58)
 size = Vector2(96, 96)
 
 [node name="宿管" type="CharacterBody2D"]
-collision_mask = 17
+collision_mask = 3
 script = ExtResource("1_keeper")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
@@ -51,7 +51,7 @@ shape = SubResource("RectangleShape2D_body")
 [node name="ClimbZone" type="Area2D" parent="."]
 position = Vector2(0, -24)
 collision_layer = 0
-collision_mask = 4
+collision_mask = 8
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="ClimbZone"]
 shape = SubResource("RectangleShape2D_climb")
@@ -59,7 +59,7 @@ shape = SubResource("RectangleShape2D_climb")
 [node name="PickupZone" type="Area2D" parent="."]
 position = Vector2(0, -24)
 collision_layer = 0
-collision_mask = 11
+collision_mask = 21
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="PickupZone"]
 shape = SubResource("RectangleShape2D_zone")

@@ -2,7 +2,7 @@ extends Node
 ## 三层交互链路自测（2026-11-04 修架构那件事的验收工具）
 ##
 ## 它验的不是"门能不能开"，而是【链路方向对不对】：
-##   角色按键 → 总管 → 楼层代理 → 代理自己去推门/搬箱子/收道具
+##   角色按键 → 总管（按编号找件）→ 那件东西自己推门/被搬/被收
 ##
 ## 为什么不用 --script 跑：那种方式下 autoload（Director）不会加载，
 ## 而这次验的正是 autoload 那条线。所以走「实例化主场景 + 正常游戏循环」这条路。
@@ -11,7 +11,7 @@ extends Node
 ##   Godot_v4.7.2 的 console 版 --headless --path <工程> res://场景/测试/三层交互自测.tscn
 ##
 ## 看到下面这两行同时出现，才算真的改对了：
-##   [代理·一楼] 收到：interact        ← 代理真的接到了角色的上报
+##   [门] 1-走廊东 已打开（求生者 推的）  ← 按编号递到门，门自己开了
 ##   [门] 1-走廊东 已打开（求生者 推的）  ← 代理真的把门推开了
 ## 只看到门开了、没有代理那一行 → 角色还在自己干活，没改对。
 
@@ -32,9 +32,9 @@ func _ready() -> void:
 	var k: CharacterBody2D = scene.get_node("keeper")
 	# 11-05：主场景多了第二个学生，挪到走廊尽头，别混进这一轮的感应区
 	scene.get_node("student2").global_position = Vector2(1500, 178)
-	var agent: Node = scene.get_node("FloorAgent")
-	var 东门: Node = agent.get_door("1-走廊东")
-	var 西门: Node = agent.get_door("1-走廊西")
+	# 2026-11-06 按编号重构：不再问代理要门，直接拿编号向总管这本账要
+	var 东门: Node = Director.thing("1-走廊东")
+	var 西门: Node = Director.thing("1-走廊西")
 
 	# ── ① 学生 E 开门：链路应走「学生 → 总管 → 代理 → 门」──
 	# 门在 (760,178)，站 (810,178)：站在门右边，身体（半宽 10）不撞门板（门板右边缘 792），
