@@ -6,7 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://dp6g075u2il3h" path="res://交互物/可使用物品/可使用物品.tscn" id="4_1xcxt"]
 [ext_resource type="PackedScene" uid="uid://doyrhatbglu8e" path="res://交互物/可搬运箱子/可搬运箱子.tscn" id="5_nuk2p"]
 [ext_resource type="PackedScene" path="res://界面/道具格/道具格.tscn" id="6_hud"]
-[ext_resource type="Script" path="res://场景/物件代理/物件代理.gd" id="7_agent"]
+[ext_resource type="Script" uid="uid://c060shmjbkkqc" path="res://场景/物件代理/物件代理.gd" id="7_agent"]
 [ext_resource type="PackedScene" path="res://角色/宿管/宿管.tscn" id="8_keeper"]
 [ext_resource type="PackedScene" path="res://界面/调试面板/调试面板.tscn" id="9_dbg"]
 
@@ -23,16 +23,16 @@ position = Vector2(439, 75)
 [node name="student" parent="." unique_id=1062713042 instance=ExtResource("2_357ng")]
 position = Vector2(879, 178)
 
-[node name="student2" parent="." instance=ExtResource("2_357ng")]
+[node name="student2" parent="." unique_id=684435303 instance=ExtResource("2_357ng")]
 position = Vector2(960, 178)
 
 [node name="UsableItem" parent="." unique_id=1396500502 instance=ExtResource("4_1xcxt")]
-thing_id = "1-道具"
 position = Vector2(1230, 182)
+thing_id = "1-道具"
 
 [node name="CarryableBox" parent="." unique_id=265815722 instance=ExtResource("5_nuk2p")]
-thing_id = "1-箱子"
 position = Vector2(1010, 186)
+thing_id = "1-箱子"
 
 [node name="HUD" parent="." unique_id=1691761956 instance=ExtResource("6_hud")]
 

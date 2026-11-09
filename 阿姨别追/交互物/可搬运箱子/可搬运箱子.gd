@@ -29,6 +29,8 @@ var 编号: String:
 ## 全工程规则（物理层位掩码）。**放在 地面层 前面**：下面的常量要引用它，
 ## GDScript 读常量是从上往下求值的（和 student.gd 同一条规矩）。
 const 规则 := preload("res://数据/通用规则.gd")
+## 抛物线飞行（反解初速 + 逐小步探地探墙），学生被扔出去时用的是同一份。
+const 抛投 := preload("res://组件/抛投/抛投.gd")
 
 const 下落重力: float = 900.0      # 像素/秒²。死物掉得比人干脆，别在空中飘
 const 最大下落速度: float = 700.0  # 再快也不会穿地：一帧最多 700/60 ≈ 12px < 一格 16px
@@ -46,9 +48,19 @@ var _底半高: float = 9.0            # 从箱子中心到底边的距离，落
 var _站住了: bool = false           # 已经贴着地面了
 var _复查倒计时: float = 0.0        # 站住之后多久再看一眼脚下（别每帧都算）
 
+# ── 被抛出 ───────────────────────────────────────────────────
+# 抛出去之后不再只是「直着往下掉」，而是带着水平速度走一段抛物线，
+# 落地或撞墙就停。重力还是用上面那个 `下落重力`，和自由落体是同一份。
+var _抛投 = 抛投.new()
+
 
 func _ready() -> void:
 	_底半高 = _量底半高()
+	_抛投.底半高 = _底半高
+	_抛投.半宽 = _量半宽()
+	_抛投.重力 = 下落重力
+	_抛投.最大速度 = 最大下落速度
+	_抛投.地面层 = 地面层
 	set_physics_process(not 被扛着)
 	Director.register_thing(编号, self)
 
@@ -70,9 +82,27 @@ func 设被扛着(扛: bool) -> void:
 	被扛着 = 扛
 	_下落速度 = 0.0
 	_站住了 = false
+	_抛投.在飞 = false
 	set_physics_process(not 扛)
 	if not 扛:
 		_落(0.0)   # 放下的那一瞬间先探一次脚下，别先往下掉一格才回过神来
+
+
+## 被学生抛出去：沿 `方向` 走一段抛物线，水平落点力求正好是 `平抛距离`。
+## 抛物线本身在 `组件/抛投/`，和「队友被扔出去」共用同一份。
+## `地面y` 由学生给（他脚底就是脚下那块地）：拖行档的箱子本来就贴着地，
+## 从箱子自己身上打射线会从地面下方穿出去，量到平台底面，高度就错了。
+## 距离 ≤ 2px 当作原地放下，直接交给 `_落` 自己掉。
+func 抛(方向: Vector2, 平抛距离: float, 地面y: float) -> void:
+	if not _抛投.起飞(self, signf(方向.x), 平抛距离, 地面y):
+		_站住了 = false
+		_下落速度 = 0.0
+		_落(0.0)
+		return
+	_站住了 = false
+	_下落速度 = 0.0
+	set_physics_process(true)
+	print("[箱子] %s 被抛出：%.0fpx" % [编号, 平抛距离])
 
 
 ## 多重？学生扛起来时问这一句，拿去查重量档位表
@@ -82,6 +112,12 @@ func 取重量() -> float:
 
 func _physics_process(delta: float) -> void:
 	if 被扛着:
+		return
+	if _抛投.在飞:
+		if _抛投.推进(self, delta):
+			_下落速度 = 0.0
+			_站住了 = true
+			_复查倒计时 = 0.2
 		return
 	# 已经贴着地了：不用每帧算，每 0.2 秒复查一次脚下（被搬到空中时会自己发现）
 	if _站住了:
@@ -93,14 +129,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _落(delta: float) -> void:
-	var 起点 := global_position + Vector2(0.0, _底半高 - 2.0)
-	var 探距 := maxf(_下落速度 * delta, 0.0) + 4.0
-	var 查询 := PhysicsRayQueryParameters2D.create(
-		起点, 起点 + Vector2(0.0, 探距), 地面层)
-	查询.collide_with_areas = false    # 只认实心地面，不认梯子/道具这些感应区
-	查询.collide_with_bodies = true
-	var 命中 := get_world_2d().direct_space_state.intersect_ray(查询)
-
+	var 命中 := _抛投.探脚下(self, maxf(_下落速度 * delta, 0.0) + 2.0)
 	if 命中.is_empty():
 		# 脚下空的：加速下落
 		_站住了 = false
@@ -123,4 +152,13 @@ func _量底半高() -> float:
 	var spr := get_node_or_null("Sprite2D")
 	if spr != null and spr.texture != null:
 		半 = maxf(半, spr.texture.get_height() * spr.scale.y * 0.5)
+	return 半
+
+
+## 中心到左右边有多远。飞行时探墙用：贴图再大也按碰撞体算
+func _量半宽() -> float:
+	var 半 := 8.0
+	var col := get_node_or_null("CollisionShape2D")
+	if col != null and col.shape is RectangleShape2D:
+		半 = (col.shape as RectangleShape2D).size.x * 0.5
 	return 半

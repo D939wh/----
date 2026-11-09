@@ -16,6 +16,10 @@ list_path = "res://数据/测试/物件清单_主场景3.gd"
 [node name="student" parent="." unique_id=1961284912 instance=ExtResource("3_student")]
 position = Vector2(500, 280)
 
+[node name="student2" parent="." unique_id=1961284913 instance=ExtResource("3_student")]
+position = Vector2(400, 280)
+
 [node name="CarryableBox" parent="." unique_id=265815722 instance=ExtResource("4_oegja")]
 position = Vector2(109, 226)
+"重量" = 20.0
 thing_id = "3-箱子1"

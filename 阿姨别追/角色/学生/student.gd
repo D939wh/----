@@ -101,15 +101,43 @@ var _自救进度: float = 0.0                 # 瘫在地上按住 H 自己爬�
 const 读条 := preload("res://界面/读条/读条.gd")
 var _读条条: CanvasLayer = null
 
+# ── 被抛出 ───────────────────────────────────────────────────
+# 被队友扔出去时，飞行交给 `组件/抛投/` —— 和箱子是同一份代码、同一个重力。
+# 落地后自己恢复碰撞体，下一帧抢占会把我接回正常 / 瘫痪。
+const 抛投 := preload("res://组件/抛投/抛投.gd")
+var _抛投 = 抛投.new()
+
 
 # ── 搬运与道具 ───────────────────────────────────────────────
 # 空手 / 负重两种状态；负重是修饰参数，不是状态机里的状态。
 enum CarryState { EMPTY, CARRYING }
 var _carry_state: CarryState = CarryState.EMPTY
 var _carried: Area2D = null             # 正扛着的那个箱子（空手时是 null）
+var _扛着的人: Node = null              # 正扛着的队友（站着、瘫着都算；null = 没扛人）
 
 const CARRY_OFFSET := Vector2(14, -30)  # 抱在胸前的相对位置（1、2 档）
 const DRAG_OFFSET := Vector2(18, -8)    # 拖在脚边的相对位置（3、4 档）
+
+# ── 抛投：按住 F 蓄力，松手按蓄力长短扔出去 ───────────────────
+# 短按 = 原地放下（距离 0）；按满 = 这一档的极限距离。
+# 极限距离按档位递减，每重一档少一个身位：1 档 4 身位 / 2 档 3 / 3 档 2 / 4 档 1。
+# 「攒了多大力」交给 `组件/蓄力/`（它只计时，不认识箱子也不认识人），
+# 「飞一条抛物线」交给 `组件/抛投/`，本文件只决定「这一档最远几像素」。
+const 蓄力 := preload("res://组件/蓄力/蓄力.gd")
+var _蓄力 = 蓄力.new()
+
+const 满蓄力时长: float = 0.8        # 按住多久到满力（秒）
+const 身位: float = 44.0             # 学生碰撞体 20×44 —— 身高就是一个身位
+const 最轻档身位: float = 4.0        # 1 档满蓄力的极限距离（身位）
+
+var _蓄力朝向: float = 1.0           # 往哪边扔：+1 右 / -1 左
+var _档号: int = 0                   # 手上这件东西在第几档（空手 = 0）
+
+# ── 搬同学 ───────────────────────────────────────────────────
+# 站着的、瘫着的队友都按 3 档算（策划案 §3.2：队友 40–60 kg）。
+# 重量走同一张档位表，所以「搬人减速 / 不能跳 / 不能爬」不用另写一套规则。
+const 队友重量: float = 45.0
+const 扛人偏移 := Vector2(18, -8)       # 拖在脚边的相对位置（3 档是拖行姿势）
 
 # ── 负重 ─────────────────────────────────────────────────────
 # 每档罚多少全在 `数据/重量档位.gd` 那张表里，本文件只照表执行。
@@ -144,9 +172,18 @@ func _ready() -> void:
 	collision_layer = 正常碰撞层                              # 站立时占「地板」层，别人能撞见我
 	collision_mask = 规则.人站的地面                           # 认：地板 + 可以穿过的地板（踩得住）
 	$ClimbZone.collision_mask = 规则.层_梯子                   # 攀爬感应区只认梯子
-	$PickupZone.collision_mask = 规则.层_瘫痪 | 规则.层_交互物  # 感应区认：瘫倒的人 + 可搬的东西
+	# 感应区认三层：站着的人（地板层）+ 瘫倒的人（瘫痪层）+ 可搬的东西（交互物层）。
+	# 站着的人要能被搬，就必须认地板层；门 / 墙虽然也在这层，但没「拉起」接口，会被 _贴身队友 筛掉。
+	$PickupZone.collision_mask = 规则.层_地板 | 规则.层_瘫痪 | 规则.层_交互物
 	$ClimbZone.area_entered.connect(_on_climb_enter)
 	$ClimbZone.area_exited.connect(_on_climb_exit)
+	# 被抛出时的飞行参数：原点就在脚底，所以底半高是 0；碰撞体 20 宽 → 半宽 10
+	_抛投.底半高 = 0.0
+	_抛投.半宽 = 10.0
+	_抛投.地面层 = 规则.人站的地面
+	# 蓄力参数：满力时长照手感表，力条上的字是「抛投」
+	_蓄力.满蓄时长 = 满蓄力时长
+	_蓄力.读条标题 = "抛投"
 	# 向总管报到：可被玩家控制
 	Director.register_controllable(self)
 	# 换人时道具格是全场共用的，切回自己要把身上的道具再播报一次。
@@ -196,8 +233,8 @@ func _physics_process(delta: float) -> void:
 ## 抢占：按优先级回答「现在该待在哪个状态」。
 ## 行序即优先级；返回空串表示不需要切换。
 func 抢占(现在: String) -> String:
-	if 被扛着:
-		return 状态名.被拎            # 位置由宿管每帧摆，我什么都不做
+	if 被扛着 or _抛投.在飞:
+		return 状态名.被拎            # 身体不由我做主：被扛着走，或被扔在空中
 	if 瘫痪:
 		return 状态名.瘫痪            # 两格血打空，蹲地
 	if 被钉住:
@@ -243,23 +280,133 @@ func _推进下穿(delta: float) -> void:
 # ============================================================
 
 ## 把感应区里的东西原样交给总管，由总管解析编号并分发。
+## 返回 true = 有东西接下了这个键（每件东西只认自己那个键）。
 ## 只在按键那一刻调用；_ready 时物件还没登记完，不能调。
-func _上报交互(键: String) -> void:
-	Director.交互(self, 键, $PickupZone.get_overlapping_areas())
+func _上报交互(键: String) -> bool:
+	return Director.交互(self, 键, $PickupZone.get_overlapping_areas())
 
 
-# E 键：开门。扛着东西时不开。
-func _open_door() -> void:
-	if 正搬着():
+## F 键按下：搬运相关的交互收在这一个键里，顺序即优先级，谁先接手就到此为止。
+##   1 肩上有队友 → 开始蓄力，松手按蓄力长短把人扔出去
+##   2 手上有箱子 → 开始蓄力，松手才扔（见 `_松开交互`）
+##   3 环境 → 箱子、道具（"interaction"）
+##   4 身边的人 → 扛起最近的队友（站着、瘫着都算）
+## 门不在这条链里：门走 E（见 `_open_door`），这样门口堆着箱子也开得掉门。
+## 人和箱子走同一条蓄力路：短按 = 原地放下，按住越久扔越远。
+func _交互键() -> void:
+	if 正扛着人() or 正搬着():
+		_开始蓄力()
 		return
-	_上报交互("open_door")
+	if _上报交互("interaction"):
+		return
+	var 目标 := _贴身队友(false)
+	if 目标 != null:
+		扛起同学(目标)
+		return
+	print("[学生] 身边没有可以交互的东西")
 
-# F 键：扛着东西时放下，空手时尝试拾取或扛起身边的东西。
-func _pick_or_drop() -> void:
+
+## 手上有东西（箱子或队友）：按住 F 开始蓄力，等松手才决定扔多远。短按 = 原地放下。
+## 计时和力条都由 `组件/蓄力/` 负责，这里只管「能不能蓄」和「朝哪边」。
+func _开始蓄力() -> void:
+	if not 正搬着() and not 正扛着人():
+		return
+	_蓄力朝向 = _当前朝向()
+	_蓄力.读条条 = _我的读条()
+	_蓄力.开始(self)
+
+
+## 每帧推进蓄力。按住左/右可以改扔的方向，松手才落地。
+func _推进蓄力(delta: float) -> void:
+	if not _蓄力.在蓄力():
+		return
+	_蓄力.推进(delta)
+	var 按 := Input.get_axis("left", "right")
+	if 按 != 0.0:
+		_蓄力朝向 = signf(按)
+
+
+## 松开 F：按蓄力比例把东西扔出去。比例 0 = 原地放下，比例 1 = 这一档的极限距离。
+## 箱子和队友走同一个比例、同一张档位表（队友固定 45kg = 3 档）。
+func _松开交互() -> void:
+	if not _蓄力.在蓄力():
+		return
+	var 比例 := _蓄力.松开()
+	var 朝向 := _蓄力朝向
 	if 正搬着():
+		_抛出箱子(朝向, 比例)
+	elif 正扛着人():
+		_抛出同学(朝向, 比例)
+
+
+## 蓄力作废：东西还在手上，力条收掉。被打断 / 切状态 / 被扛走都走这里，可以重复调。
+func _取消蓄力() -> void:
+	_蓄力.取消()
+
+
+## 蓄力中。状态脚本靠它决定「其他键一律不接」。
+func 蓄力中() -> bool:
+	return _蓄力.在蓄力()
+
+
+## 往哪边扔：先看玩家现在按着哪个方向，再看他正在往哪走，最后默认朝右。
+func _当前朝向() -> float:
+	var 按 := Input.get_axis("left", "right")
+	if 按 != 0.0:
+		return signf(按)
+	if absf(velocity.x) > 1.0:
+		return signf(velocity.x)
+	return 1.0
+
+
+## 这一档满蓄力能扔多远（像素）。每重一档少一个身位：4 / 3 / 2 / 1。
+## 箱子、队友共用这一条 —— 各写一份的话，以后调手感必然漏掉一边。
+func _这一档极限距离() -> float:
+	return maxf(最轻档身位 - float(maxi(_档号, 1) - 1), 1.0) * 身位
+
+
+## 把箱子按蓄力比例扔出去。极限距离见 `_这一档极限距离()`。
+func _抛出箱子(朝向: float, 比例: float) -> void:
+	var box := _carried
+	if box == null or not is_instance_valid(box):
 		_drop_box()
 		return
-	_上报交互("interaction")
+	var 起点 := _扛着的位置()      # 得在 _drop_box 之前取：放下后负重清零，姿势会变
+	# 身位是从「人」量起的，不是从「手的出手点」量起 —— 把出手点那一小段先扣掉
+	var 距离 := maxf(_这一档极限距离() * 比例 - absf(起点.x), 0.0)
+	_drop_box()                    # 交还场景 + 恢复负重 + 收掉蓄力
+	box.global_position = global_position + Vector2(absf(起点.x) * 朝向, 起点.y)
+	if box.has_method("抛"):
+		# 第三个参数是「脚下的地面在多高」：学生原点就在脚底，站着扔时它就是地面
+		box.抛(Vector2(朝向, 0.0), 距离, global_position.y)
+
+
+## 把肩上的队友按蓄力比例扔出去。极限距离和箱子用同一条公式 ——
+## 队友固定 45kg（3 档），所以最多 2 个身位，最轻的箱子是 4 个。
+## 短按（距离 ≈ 0）不扔，直接走 `放下同学()` 的老摆位：放在脚边。
+func _抛出同学(朝向: float, 比例: float) -> void:
+	var 人 := _扛着的人
+	if 人 == null or not is_instance_valid(人):
+		放下同学()
+		return
+	var 起点 := 扛人偏移            # 得在放下之前取：放下后负重清零，姿势会变
+	# 身位从「人」量起，不是从出手点量起 —— 先把出手点那一小段扣掉
+	var 距离 := maxf(_这一档极限距离() * 比例 - absf(起点.x), 0.0)
+	放下同学()                      # 交还场景 + 恢复负重 + 收掉蓄力
+	if 距离 <= 2.0:
+		return                      # 短按 = 原地放下，摆位用 `放下同学` 那一套
+	人.global_position = global_position + Vector2(absf(起点.x) * 朝向, 起点.y)
+	if 人.has_method("抛出去"):
+		# 第三个参数同样是「脚下的地面在多高」，我脚底就是那块地
+		人.抛出去(朝向, 距离, global_position.y)
+
+
+# E 键：开门。双手占着（搬箱子或扛人）时不开 —— 得先按 F 放下东西。
+func _open_door() -> void:
+	if 正搬着() or 正扛着人():
+		print("[学生] 手上占着，先按 F 放下才能开门")
+		return
+	_上报交互("open_door")
 
 # R 键：把手上搬着的东西往锁口里插。空手时不响应。
 func _insert_key() -> void:
@@ -271,6 +418,40 @@ func _insert_key() -> void:
 ## 手上是否搬着东西。供状态脚本判断按键分支。
 func 正搬着() -> bool:
 	return _carry_state == CarryState.CARRYING
+
+
+## 肩上是否扛着队友。和 `正搬着()` 分开：箱子和人走两条路，但都占手。
+func 正扛着人() -> bool:
+	return _扛着的人 != null and is_instance_valid(_扛着的人)
+
+
+## 扛起一名队友：挂到自身名下、关掉他的碰撞体，按 3 档负重。
+## 站着的和瘫着的走同一套 —— 被扛的人自己进「被拎」状态，不再吃输入。
+func 扛起同学(谁: Node) -> void:
+	if 谁 == null or not is_instance_valid(谁) or 谁 == self:
+		return
+	if 正搬着() or 正扛着人():
+		return                    # 双手已经被箱子或另一个队友占住
+	_扛着的人 = 谁
+	谁.被扛起(self)                # 学生那边自己 reparent + 关碰撞 + 切「被拎」
+	_应用负重(队友重量)            # 3 档：拖在脚边，走不快、跳不了、爬不了
+	谁.position = 扛人偏移
+	print("[学生] 扛起同学：%s" % 谁.name)
+
+
+## 放下队友：交还场景，摆到脚边。他自己的状态（瘫着还是站着）原样保留。
+func 放下同学() -> void:
+	_取消蓄力()                    # 人脱手了，头顶那根力条也得收掉
+	var 人 := _扛着的人
+	_扛着的人 = null
+	if 人 == null or not is_instance_valid(人):
+		_应用负重(0.0)
+		return
+	人.被放下(get_parent())
+	# 两人原点都在脚底，摆在脚边同一高度正好贴地，不会叠在一起被物理弹开
+	人.global_position = global_position + Vector2(26.0, 0.0)
+	_应用负重(0.0)                 # 人放下了，速度/跳跃/攀爬全恢复
+	print("[学生] 放下同学：%s" % 人.name)
 
 
 ## 我现在扛着什么？空手返回 null。给锁口用：它要知道插进来的是哪块板子
@@ -301,6 +482,8 @@ func 钉住(开: bool) -> void:
 # 扛起箱子：把箱子设为自身子节点，位置摆在身前（重物拖在脚边）。
 # 由箱子在确认按键归属后调用。
 func 扛起(box: Area2D) -> void:
+	if 正扛着人() or 正搬着():
+		return                        # 双手已经占满：必须先把旧的放下，才能扛下一个
 	_carried = box
 	_carry_state = CarryState.CARRYING
 	_应用负重(box.取重量() if box.has_method("取重量") else 0.0)
@@ -311,21 +494,25 @@ func 扛起(box: Area2D) -> void:
 
 # 放下箱子：还回场景里，落在脚边，然后它自己受重力落到地面
 func _drop_box() -> void:
+	_取消蓄力()                          # 东西脱手了，蓄力自然作废
 	var box := _carried
 	_carried = null
 	_carry_state = CarryState.EMPTY
+	_应用负重(0.0)                        # 先恢复负重：箱子就算已经失效，人也不能一直被压着
+	if box == null or not is_instance_valid(box):
+		return
 	box.reparent(get_parent(), false)     # 交还给场景
 	# 学生自己的原点就在脚底（碰撞体从 -44 到 0），所以这里减一个箱子的半高就贴地了
 	box.global_position = global_position + Vector2(18, -12)
 	if box.has_method("设被扛着"):
 		box.设被扛着(false)               # 从这里开始它自己受重力
-	_应用负重(0.0)                        # 人轻松了，速度/跳跃全恢复
 
 # 按公斤换算出这一档的移动/跳跃限制。拿起和放下时各算一次。
 func _应用负重(公斤: float) -> void:
 	_负重公斤 = 公斤
 	_负重档名 = "空手" if 公斤 <= 0.0 else 重量档位.档位全名(公斤)
 	var 档: Dictionary = 重量档位.空手() if 公斤 <= 0.0 else 重量档位.取(公斤)
+	_档号 = int(档["档号"])               # 抛投的极限距离按它算（4 / 3 / 2 / 1 身位）
 	_移速倍率 = float(档["移速倍率"])
 	_跳跃高度倍率 = float(档["跳跃高度倍率"])
 	_可否慢走 = bool(档["可否慢走"])
@@ -338,7 +525,7 @@ func _扛着的位置() -> Vector2:
 
 # 给左上角调试面板看的：现在扛着几公斤、被罚成什么样
 func 负重说明() -> String:
-	if not 正搬着():
+	if not 正搬着() and not 正扛着人():
 		return "空手"
 	return "%s %.0fkg｜速度 %d%%｜%s｜%s" % [
 		_负重档名,
@@ -382,11 +569,15 @@ func _refresh_item_slot() -> void:
 # 被打 / 瘫痪 / 被扛的对外接口。宿管直接调用这些方法。
 # ============================================================
 
-## 身边是否躺着可救的队友。排除自己和已被扛走的。
-func _贴身瘫痪队友() -> Node:
+## 身边最近的队友：站着、瘫着都算；排除自己、排除已经被别人扛走的、排除还飞在空中的。
+## `只找瘫的` = true 时只认瘫倒的 —— 拉起（H）要的就是这个筛法。
+func _贴身队友(只找瘫的 := true) -> Node:
 	for body in $PickupZone.get_overlapping_bodies():
-		if body != self and body.has_method("拉起") and body.瘫痪 and not body.被扛着:
-			return body
+		if body == self or not body.has_method("拉起"):
+			continue
+		if body.被扛着 or body.在飞() or (只找瘫的 and not body.瘫痪):
+			continue
+		return body
 	return null
 
 
@@ -427,6 +618,10 @@ func 被打中() -> void:
 	if 瘫痪 or 被扛着:
 		return   # 已经瘫了就别再打了；扛着的时候打不着
 	_取消救人()   # 正在拉人的时候挨了一下 → 手上的劲散了，读条作废
+	if 正扛着人():
+		放下同学()   # 肩上的人跟着落地（策划案：被挥击命中即掉落）
+	if 正搬着():
+		_drop_box()  # 手上的东西一样脱手，不能挨了打还端着
 	血量 -= 1
 	if 血量 <= 0:
 		_瘫了()
@@ -439,18 +634,55 @@ func _瘫了() -> void:
 	$AnimatedSprite2D.modulate = 瘫痪变色
 	print("[学生] 我瘫了（%d/%d 格）" % [血量, MAX_HP])
 
-## 被宿管扛起：挂到宿管名下并禁用自身碰撞体，避免两人互相挤压。
+## 被扛起（宿管或队友都走这里）：挂到对方名下并禁用自身碰撞体，避免两人互相挤压。
 func 被扛起(谁: Node2D) -> void:
+	if 正扛着人():
+		放下同学()   # 自己被抬走时，不能把肩上的同学一起带走
+	if 正搬着():
+		_drop_box()  # 手上的东西也一样，抬走之前先落地
+	_抛投.在飞 = false   # 被人从半空接住：飞行作废，从此交给扛我的人
 	被扛着 = true
+	velocity = Vector2.ZERO
 	reparent(谁, false)
 	_set_collision_disabled(true)
 
-## 被放下：交还给场景，瘫的状态保留（还瘫着，趴在地上）
+## 被放下：交还给场景。站着还是瘫着，原样保留。
 func 被放下(原父节点: Node) -> void:
 	被扛着 = false
 	reparent(原父节点, false)
 	_set_collision_disabled(false)
-	print("[学生] 被放下了（还瘫着）")
+	print("[学生] 被放下了")
+
+
+# ============================================================
+# 被队友扔出去 —— 和箱子走同一个组件、同一个重力
+# ============================================================
+
+## 是否正被扔在空中。要找队友扛 / 拉之前先看这一句：空中接人不算。
+func 在飞() -> bool:
+	return _抛投.在飞
+
+
+## 被队友扔出去。抛物线全在 `组件/抛投/`；我这里只负责「起飞前关碰撞、
+## 落地后把碰撞挂回去」——位置一路上由组件改，不走 move_and_slide。
+## 落地之后下一帧抢占会把我接回正常 / 瘫痪，原状态原样保留。
+func 抛出去(方向: float, 平抛距离: float, 地面y: float) -> void:
+	if not _抛投.起飞(self, 方向, 平抛距离, 地面y):
+		return
+	velocity = Vector2.ZERO
+	_set_collision_disabled(true)
+	print("[学生] 我被扔出去了：%.0fpx" % 平抛距离)
+
+
+## 空中每帧推进一次（由 `被拎.gd` 调）。返回时若落地，碰撞体已经挂回去了。
+func _飞(delta: float) -> void:
+	if not _抛投.在飞:
+		return
+	if _抛投.推进(self, delta):
+		velocity = Vector2.ZERO
+		_set_collision_disabled(false)
+		print("[学生] 落地了")
+
 
 ## 肩上/落地切换碰撞体。扛着时禁用（不挡宿管的路），放下时恢复（又能被撞见）
 func _set_collision_disabled(禁用: bool) -> void:
