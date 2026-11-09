@@ -1,9 +1,31 @@
 extends CharacterBody2D
-## 宿管：能走、能跳、能爬梯、开门、挥击、抓捕、扛人
+## 宿管：能走、能跳、能爬梯、开门、挥击、抓捕、扛人；没人按键时自己会巡逻和追人。
 ## 与学生的区别：走得更快；不捡东西不搬箱子（E 只开门）；在 keeper 组，门按宿管时长开关
+##
+## 【2026-11-09 拆过一次】原来 `_physics_process` 里那条 90 行的 if 链整段搬进了
+## `角色/宿管/状态/手控.gd`，本文件只剩：常量、服务函数、`抢占()`、`_搭状态机()`。
+## 理由和学生拆状态机一样 —— 想加一种行为模式（这里是 AI 的待机/巡逻/追击）
+## 只新建一个状态脚本，不用往一条越来越长的 if 链里插。
+##
+## 【这轮只做「能动 + 能追人」】挥击 / 抓捕 / 扛人原样留在手控状态里，
+## AI 状态不碰它们（主人 2026-11-09 定：打人留到后面单独优化）。想给 AI 加打人，
+## 新建 `攻击.gd` 并在 `抢占()` 里补一行，别改这三个 AI 状态。
 
 ## 全工程规则（物理层位掩码等）。放最前面：下面的常量要引用它。
 const 规则 := preload("res://数据/通用规则.gd")
+
+# ── 状态机 ───────────────────────────────────────────────────
+# 状态名常量集中在 状态名.gd（拼错就报红，不会运行时才崩）。
+const 状态名 := preload("res://角色/宿管/状态/状态名.gd")
+const 状态机 := preload("res://组件/状态机/状态机.gd")
+const 手控状态 := preload("res://角色/宿管/状态/手控.gd")
+const 待机状态 := preload("res://角色/宿管/状态/待机.gd")
+const 巡逻状态 := preload("res://角色/宿管/状态/巡逻.gd")
+const 追击状态 := preload("res://角色/宿管/状态/追击.gd")
+
+## 状态机本体。`_ready` 里建，状态对象也在那儿注册。
+## 下划线开头：供状态脚本通过 `host._机器` 取用。
+var _机器
 
 # ── 走 ────────────────────────────────────────────────────
 const SPEED: float = 370.0        # 走速（像素/秒）
@@ -34,6 +56,27 @@ const 抓捕读条: float = 1.2             # 贴身按住 G 多久才把人扛�
 const CARRY_STUDENT_OFFSET := Vector2(14, -34)  # 学生扛在肩上的相对位置
 const CARRY_SPEED_MULT: float = 0.6     # 扛人时移速乘它
 
+# ── AI（这轮只用到前五条）─────────────────────────────────
+## 察觉半径（像素）。DetectZone 的圆半径照它设，改这里要同步改 .tscn。
+## 策划案的「视野 9 米 / 听觉 2.6 米」是目标形态；这一轮先用一个圆形察觉圈，
+## 因为它只需要回答「附近有没有人」，不需要视野锥和墙体遮挡。
+const 察觉半径: float = 360.0
+## 巡逻速度：比走速慢一截，免得她在楼道里跑得像在追人。
+const 巡逻速度: float = SPEED * 0.6
+## 追击速度：直接吃走速。策划案「追击 5.4 / 常走 4.6 米每秒」比例 ≈ 1.17，
+## 这里 370 对 315 也正好 ≈ 1.17，和学生那套比例对得上，别再单独编一个数。
+const 追击速度: float = SPEED
+## 巡逻半径：从出生点往左右各走多远（像素）。主场景3 的楼板不长，先给 200。
+const 巡逻半径: float = 200.0
+## 贴身距离：横坐标差小于它就算「已经贴上了」，追击状态不再往前挤。
+const 贴身距离: float = 30.0
+## 待机最多站多久（秒）。超过就起身巡逻，免得她像根柱子插在楼道里。
+const 待机最长: float = 2.0
+
+## 巡逻用：起点与当下朝哪边走（+1 右 / -1 左）。由 `巡逻.gd` 维护。
+var _巡逻起点 := Vector2.ZERO
+var _巡逻方向: int = 1
+
 var _swing_cd_left: float = 0.0         # 挥击冷却还剩几秒
 var _swing_recover_left: float = 0.0    # 后摇还剩几秒（>0 时不能动）
 var _swing_dir: float = 1.0             # 面朝哪边（1 右 / -1 左）。出生默认朝右，之后随方向键更新
@@ -63,12 +106,26 @@ func _ready() -> void:
 	$ClimbZone.collision_mask = 规则.层_梯子
 	# 感应区认三层：站着的人（地板层）+ 瘫倒的人（瘫痪层）+ 可搬的东西（交互物层）
 	$PickupZone.collision_mask = 规则.层_地板 | 规则.层_瘫痪 | 规则.层_交互物
+	# 察觉圈只认人：站着的人 + 瘫倒的人。箱子门板那些不该让她「看见」。
+	$DetectZone.collision_mask = 规则.层_地板 | 规则.层_瘫痪
 	# 门靠这个组认出「推门的是宿管」，开门时长由门照清单决定
 	add_to_group("keeper")
 	$AnimatedSprite2D.play("待机")   # 生图只有一张朝右的姿态，朝左用水平翻转
 	$ClimbZone.area_entered.connect(_on_climb_enter)
 	$ClimbZone.area_exited.connect(_on_climb_exit)
 	Director.register_controllable(self)   # 向总管报到：我可以被玩家控制
+	_搭状态机()
+
+
+## 建状态机、注册全部状态、进第一个状态。
+func _搭状态机() -> void:
+	_机器 = 状态机.new()
+	_机器.host = self
+	_机器.加(状态名.手控, 手控状态.new())
+	_机器.加(状态名.待机, 待机状态.new())
+	_机器.加(状态名.巡逻, 巡逻状态.new())
+	_机器.加(状态名.追击, 追击状态.new())
+	_机器.启动(状态名.待机)
 
 
 func _on_climb_enter(_area: Area2D) -> void:
@@ -85,102 +142,119 @@ func _受控() -> bool:
 	return Director.当前控制 == self or Director.当前控制 == null
 
 
+## 每帧：计时器往前推 → 跑状态机（状态机内部先问 `抢占()`）。
 func _physics_process(delta: float) -> void:
-	# 计时器照走，跟当前谁被控制无关
+	# 计时器照走，跟「现在谁在按键盘」无关
 	_swing_cd_left = maxf(_swing_cd_left - delta, 0.0)
 	_swing_recover_left = maxf(_swing_recover_left - delta, 0.0)
+	_机器.跑(delta)
 
-	# 没被控制时：不吃键盘，但照常受重力，不会浮在空中
-	# 抓捕中被切走 → 作废并收掉读条
-	if not _受控():
-		if _抓捕目标 != null:
-			_取消抓捕()
+
+# ============================================================
+# 抢占：优先级只写在这里一处。行序即优先级，返回空串 = 不用切。
+# ============================================================
+func 抢占(现在: String) -> String:
+	# ① 玩家手里握着她 → 吃键盘，原来的 if 链原样跑（回归基线靠这一条保住）
+	if _受控():
+		return 状态名.手控
+	# ② 没人按她：看见人就是最高优先 —— 这一轮「能追人」的全部含义就在这一句。
+	#    注意这里**不返回「现在」**：待机/巡逻/追击之间怎么走由它们自己算（
+	#    待机站够了会切巡逻，巡逻看不见人就掉头），抢占只管「看见人必须追」。
+	if _看得见的目标() != null:
+		return 状态名.追击
+	# ③ 看不见人：手控要退回 AI，其余交给状态自己
+	if 现在 == 状态名.手控:
+		return 状态名.待机
+	return ""
+
+
+# ============================================================
+# AI 的服务函数 —— 状态脚本从这里取「看见了谁」「该不该走」，自己不做判断
+# ============================================================
+
+## 察觉圈里最近的那个人。没有就返回 null。
+## 只认「有被打中接口的」——学生有，箱子没有；墙和门根本不在察觉圈认的层里。
+## 瘫在地上的人也算：她要把人扛走这轮不做，但「已经追到了」得算得出来。
+func _看得见的目标() -> Node:
+	var 最近: Node = null
+	var 最近距离 := 察觉半径
+	for body in $DetectZone.get_overlapping_bodies():
+		if body == self or not body.has_method("被打中"):
+			continue
+		var d: float = global_position.distance_to(body.global_position)
+		if d < 最近距离:
+			最近距离 = d
+			最近 = body
+	return 最近
+
+
+## 决策：现在该待在哪个状态。形状照参考项目的 `decide()`，但只留这轮要用的分支。
+## 看见人 → 追击；看不见 → 巡逻。打人 / 抓捕 / 搜索都还没进来（主人要求后面再优化）。
+func decide() -> String:
+	if _看得见的目标() == null:
+		return 状态名.巡逻
+	return 状态名.追击
+
+
+## 朝某个横坐标走一步。返回值 = 这一步走顺了吗（撞墙 / 到崖边为 false）。
+##
+## 两条探针（照参考项目膝高探法的路数，也是学生抛投探墙同一套）：
+##   ① 前方膝高有墙 → 停下（这轮不蹦台阶，主场景3 没台阶要跨）
+##   ② 前方脚下没地面 → 停下（别走下楼层，掉下去就不叫「追人」了）
+## 两条射线都要 exclude 自己：宿管本体站在地板层上，不排除会先量到自己（静默错误）。
+func _朝目标走(目标横坐标: float, 速度: float, delta: float) -> bool:
+	var 方向 := signf(目标横坐标 - global_position.x)
+	if 方向 == 0.0:
+		方向 = float(_巡逻方向)
+	_面朝(方向)
+
+	var 走顺 := true
+	if is_on_floor():
+		if _前方有墙(方向):
+			走顺 = false
+		elif _前方是崖(方向):
+			走顺 = false
+
+	if 走顺:
+		velocity.x = move_toward(velocity.x, 方向 * 速度, ACCEL * delta)
+	else:
 		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
-		if not is_on_floor():
-			velocity.y += GRAVITY * delta
-		move_and_slide()
-		return
 
-	var dir := Input.get_axis("left", "right")
-	var updown := Input.get_axis("up", "down")
-
-	# ── 爬梯：碰到梯子 + 按了上下才挂住。扛着人不能爬 ──
-	if _on_ladder and updown != 0.0 and _carried_student == null:
-		_climbing = true
-	if _carried_student != null:
-		_climbing = false
-	if _on_ladder and _climbing:
-		velocity.y = updown * CLIMB_SPEED
-		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
-		if Input.is_action_just_pressed("jump"):
-			velocity.y = CLIMB_OFF_JUMP
-			velocity.x = dir * SPEED * 0.6
-			_climbing = false
-		move_and_slide()
-		return
-
-	# ── 开门：E 键（open_door）。梯子上不开门 ──
-	if Input.is_action_just_pressed("open_door"):
-		_开门()
-
-	# ── 键位分工 ──
-	#   F（interaction）→ 挥击
-	#   G（grab）       → 扛人：肩上有人则放下；贴身有瘫倒的学生则按住读条后扛走
-	_更新朝向()
-	if Input.is_action_just_pressed("interaction"):
-		_挥击()
-	_抓捕(delta)
-
-	# ── 重力 ──
+	# 重力：AI 自己不会跳，只要别浮在空中
 	if not is_on_floor():
-		if _hang_left > 0.0:
-			_hang_left = maxf(_hang_left - delta, 0.0)
-			if _hang_left <= 0.0:
-				_fast_fall = true
-		elif absf(velocity.y) < HANG_VY_BAND and not _fast_fall:
-			_hang_left = HANG_TIME
-		else:
-			velocity.y += GRAVITY * (FALL_GRAVITY_MULT if _fast_fall else 1.0) * delta
-	else:
-		_fast_fall = false
-
-	# ── 跳跃（土狼时间 + 按键记账）──
-	_coyote = COYOTE_TIME if is_on_floor() else maxf(_coyote - delta, 0.0)
-	# 按住抓人时不记账：抓人得站定，边跳边抓不合理
-	if Input.is_action_just_pressed("jump") and _抓捕目标 == null:
-		_buffer = JUMP_BUFFER
-	else:
-		_buffer = maxf(_buffer - delta, 0.0)
-
-	if _buffer > 0.0 and _coyote > 0.0:
-		velocity.y = JUMP_VELOCITY
-		_buffer = 0.0
-		_coyote = 0.0
-		_hang_left = 0.0
-		_fast_fall = false
-
-	if Input.is_action_just_released("jump") and velocity.y < 0.0:
-		velocity.y *= JUMP_CUT
-
-	# ── 左右速度 ──
-	# 三个因素影响移速：后摇站定（挥完不能动）、扛人减速、按住抓人时站定
-	var 走速 := SPEED
-	if _carried_student != null:
-		走速 = SPEED * CARRY_SPEED_MULT
-	if _抓捕目标 != null:
-		dir = 0.0
-	if dir != 0.0 and _swing_recover_left <= 0.0:
-		var same_dir := signf(velocity.x) == signf(dir)
-		if not (not is_on_floor() and same_dir and absf(velocity.x) > 走速):
-			velocity.x = move_toward(velocity.x, dir * 走速, ACCEL * delta)
-	else:
-		velocity.x = move_toward(velocity.x, 0.0, FRICTION * delta)
-
-	# 扛着学生时，把他摆到肩上（位置每帧算，跟学生搬箱子同一个套路）
-	if _carried_student != null and is_instance_valid(_carried_student):
-		_carried_student.global_position = global_position + Vector2(_swing_dir * CARRY_STUDENT_OFFSET.x, CARRY_STUDENT_OFFSET.y)
-
+		velocity.y += GRAVITY * delta
 	move_and_slide()
+	return 走顺
+
+
+## 转向 + 翻转贴图。生图只有一张朝右的姿态。
+## 手控时朝向由 `_更新朝向()` 按方向键管，AI 不抢。
+func _面朝(方向: float) -> void:
+	if 方向 == 0.0:
+		return
+	_swing_dir = 方向
+	if not _受控():
+		$AnimatedSprite2D.flip_h = 方向 < 0.0
+
+
+## 膝高往前 18px 有没有墙（地板层）。
+func _前方有墙(方向: float) -> bool:
+	var 膝 := global_position + Vector2(0, -22)
+	var 查询 := PhysicsRayQueryParameters2D.create(
+		膝, 膝 + Vector2(18.0 * 方向, 0.0), 规则.层_地板)
+	查询.collide_with_areas = false
+	查询.exclude = [get_rid()]
+	return not get_world_2d().direct_space_state.intersect_ray(查询).is_empty()
+
+
+## 脚前 14px 往下探 10px 有没有地面。探不到 = 崖边。
+func _前方是崖(方向: float) -> bool:
+	var 起步 := global_position + Vector2(14.0 * 方向, -2.0)
+	var 查询 := PhysicsRayQueryParameters2D.create(
+		起步, 起步 + Vector2(0.0, 10.0), 规则.人站的地面)
+	查询.collide_with_areas = false
+	查询.exclude = [get_rid()]
+	return get_world_2d().direct_space_state.intersect_ray(查询).is_empty()
 
 
 ## 把感应区原样交给总管，由它解析编号并分发。写法与学生一致。
