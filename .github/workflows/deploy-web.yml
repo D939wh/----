@@ -50,7 +50,7 @@ jobs:
           mkdir -p 阿姨别追/build/web
           "./Godot_v${GODOT_VERSION}-stable_linux.x86_64" \
             --headless --path 阿姨别追 \
-            --export-release "Web" 阿姨别追/build/web/index.html
+            --export-release "Web" "$PWD/阿姨别追/build/web/index.html"
 
       - name: 检查产物齐全（HTML/JS/WASM/PCK 缺一即失败）
         run: |
