@@ -32,16 +32,19 @@ var _target: float = 0.0        # 正往哪去
 var _user: Node = null          # 现在是谁在推这扇门
 var _blocked: bool = true       # 当前碰撞体是不是挡着路
 var _已解锁: bool = false       # 被三块钥匙板弹开过 = 从此锁死，谁也关不上
+var 空气墙: bool = false        # 看不见门板、E 推不动的死墙：只认三块钥匙真解锁弹开（大门用）
 
 @onready var _panel: Polygon2D = $Panel
 @onready var _blocker: CollisionShape2D = $Blocker/CollisionShape2D
 
 
-## 由物件代理按清单调用：站哪、开门要几秒。（编号由代理在 add_child 前盖好）
-func setup(pos: Vector2, 用时: Dictionary = {}) -> void:
+## 由物件代理按清单调用：站哪、开门要几秒、是不是空气墙。（编号由代理在 add_child 前盖好）
+func setup(pos: Vector2, 用时: Dictionary = {}, 空气墙: bool = false) -> void:
 	position = pos
 	if not 用时.is_empty():
 		_开门用时 = 用时.duplicate()
+	self.空气墙 = 空气墙
+	_apply()   # _ready 在 add_child 时先跑过一次，这里按新配置再刷一遍（空气墙藏门板）
 
 
 func _ready() -> void:
@@ -53,7 +56,7 @@ func _ready() -> void:
 ## 有人按了 E（求生者）或要开关门（宿管）。谁按，谁接管。
 ## 已经解锁的门不再接受开关：策划案 §2.3 写的是「弹开并撑住」。
 func press(who: Node) -> void:
-	if _已解锁:
+	if 空气墙 or _已解锁:
 		return
 	_user = who
 	_target = 0.0 if _target > 0.5 else 1.0
@@ -122,7 +125,7 @@ func _is_keeper(who: Node) -> bool:
 
 ## 把「开到哪儿」变成看得见的样子。两态：关着 = 实体，开着 = 隐藏
 func _apply() -> void:
-	_panel.visible = _amount <= 0.95   # 关着才看得见门板，开够就整块藏掉
+	_panel.visible = (not 空气墙) and _amount <= 0.95   # 空气墙从不露脸；普通门关着才看得见门板，开够就整块藏掉
 	var want_blocked := _amount <= 0.95
 	if want_blocked != _blocked:
 		_blocked = want_blocked

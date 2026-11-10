@@ -577,8 +577,12 @@ func 闪一下攻击范围() -> void:
 ## 贴身 40px 内有没有瘫痪的学生？抓捕读条的对象从这里来
 func _贴身瘫痪学生() -> Node:
 	for body in $PickupZone.get_overlapping_bodies():
-		if body != self and body.has_method("被打中") and body.瘫痪:
-			return body
+		if body == self or not body.has_method("被打中") or not body.瘫痪:
+			continue
+		# 刚被放下 / 刚被扔到地上的学生，有搬运保护：这几秒抓不走（防「放下→立刻再抓」）
+		if body.has_method("可被搬运") and not body.可被搬运():
+			continue
+		return body
 	return null
 
 
@@ -624,6 +628,11 @@ func _抓捕(delta: float) -> void:
 		print("[宿管] 抓捕中断：%s 已经不在原地瘫着了" % _抓捕目标.name)
 		_取消抓捕()
 		return
+	# 刚被放下 / 刚被扔到地上的学生：搬运保护期内抓不住（保护烧完就自动接上）
+	if _抓捕目标.has_method("可被搬运") and not _抓捕目标.可被搬运():
+		print("[宿管] 抓捕中断：%s 刚脱手，还没缓过来" % _抓捕目标.name)
+		_取消抓捕()
+		return
 
 	_抓捕进度 += delta
 	_我的读条().推进(_抓捕进度)   # 条跟着走：填到几分、还剩几秒
@@ -643,6 +652,9 @@ func _取消抓捕() -> void:
 
 ## 读条满了：把学生扛上肩。单向接口，学生那边自己 reparent + 清速度
 func _扛起(学生: Node) -> void:
+	# 兜底：学生还在搬运保护里就不扛（读条最后几帧里保护可能刚被续上）
+	if 学生.has_method("可被搬运") and not 学生.可被搬运():
+		return
 	_carried_student = 学生
 	学生.被扛起(self)
 	# 扛人期间不能爬梯

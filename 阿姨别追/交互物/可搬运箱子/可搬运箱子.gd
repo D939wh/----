@@ -43,6 +43,11 @@ const 地面层: int = 规则.人站的地面
 var 已插: bool = false
 
 var 被扛着: bool = false            # 学生拿起时置 true、放下置 false
+## 刚脱手，还有几秒谁也搬不动我（秒）。0 = 现在能被搬。
+## 【2026-11-11 加】时长在 `数据/通用规则.gd` 的 `搬运保护时长`，和学生共用同一个数。
+## 计时是真时间，从脱手那一刻起一直走 —— 被抛在空中 / 还在往下掉也照走，
+## 所以「丢下 → 立刻捡回来」「扔出去 → 半空接住再扔」都掐死在源头。
+var _搬运保护剩余: float = 0.0
 var _下落速度: float = 0.0
 var _底半高: float = 9.0            # 从箱子中心到底边的距离，落地对齐用
 var _站住了: bool = false           # 已经贴着地面了
@@ -71,10 +76,28 @@ func 被按键(键: String, 谁: Node) -> bool:
 		return false
 	if 已插:
 		return false   # 已经焊在锁孔上的板子不该再被扛走
+	if not 可被搬运():
+		print("[箱子] %s 刚脱手（%s），先别捡" % [编号, _保护读秒()])
+		return false   # 搬运保护：刚放下 / 刚落地，谁都不能立刻再搬
 	if 谁 == null or not is_instance_valid(谁) or not 谁.has_method("扛起"):
 		return false
 	谁.扛起(self)
 	return true
+
+
+## 现在能不能搬我？保护期内不行。学生扛起前、箱子自己按键时都问这一句。
+func 可被搬运() -> bool:
+	return _搬运保护剩余 <= 0.0
+
+
+## 套保护。放下 / 抛出（脱手那一刻）都走这里。
+func _给搬运保护() -> void:
+	_搬运保护剩余 = 规则.搬运保护时长
+
+
+## 给日志看的剩几秒（"还剩 1.2s"）
+func _保护读秒() -> String:
+	return "还剩 %.1fs" % _搬运保护剩余
 
 
 ## 学生拿起/放下时调用。扛着的时候不跑重力，不然它会在人手里往下掉
@@ -85,6 +108,7 @@ func 设被扛着(扛: bool) -> void:
 	_抛投.在飞 = false
 	set_physics_process(not 扛)
 	if not 扛:
+		_给搬运保护()   # 脱手那一刻就套上：放下 / 扔出去都从这里过
 		_落(0.0)   # 放下的那一瞬间先探一次脚下，别先往下掉一格才回过神来
 
 
@@ -111,6 +135,9 @@ func 取重量() -> float:
 
 
 func _physics_process(delta: float) -> void:
+	# 搬运 CD 的秒表：从脱手那一刻起按真时间走，被抛在空中 / 还在往下掉也照走
+	if _搬运保护剩余 > 0.0:
+		_搬运保护剩余 = maxf(_搬运保护剩余 - delta, 0.0)
 	if 被扛着:
 		return
 	if _抛投.在飞:

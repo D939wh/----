@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://交互物/出口/出口.gd" id="1_exit"]
 
 [sub_resource type="RectangleShape2D" id="Rect_exit"]
+resource_local_to_scene = true
 size = Vector2(120, 96)
 
 [sub_resource type="SystemFont" id="SystemFont_cn"]
