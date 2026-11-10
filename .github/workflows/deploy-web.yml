@@ -1,0 +1,82 @@
+name: 发布网页版到 GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.7.2
+
+jobs:
+  export:
+    name: 导出网页包
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取仓库
+        uses: actions/checkout@v4
+
+      - name: 下载 Godot 引擎（版本与本地完全一致）
+        run: |
+          curl -L --fail -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          chmod +x "Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+
+      - name: 下载并安装导出模板（与引擎版本完全匹配）
+        run: |
+          curl -L --fail -o templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          unzip -q templates.tpz -d /tmp/templates
+          mv /tmp/templates/templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
+
+      - name: 导入工程资源
+        run: |
+          "Godot_v${GODOT_VERSION}-stable_linux.x86_64" \
+            --headless --path 阿姨别追 --import
+
+      - name: 导出网页包（与本地同一预设「Web」）
+        run: |
+          "Godot_v${GODOT_VERSION}-stable_linux.x86_64" \
+            --headless --path 阿姨别追 \
+            --export-release "Web" 阿姨别追/build/web/index.html
+
+      - name: 检查产物齐全（HTML/JS/WASM/PCK 缺一即失败）
+        run: |
+          cd 阿姨别追/build/web
+          for f in index.html index.js index.wasm index.pck; do
+            if [ ! -s "$f" ]; then
+              echo "缺少导出产物：$f" >&2
+              exit 1
+            fi
+          done
+          ls -la
+
+      - name: 上传部署产物（同一次部署包含全部配套文件）
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 阿姨别追/build/web
+
+  deploy:
+    name: 部署到 GitHub Pages
+    needs: export
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+      - name: 部署
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -20,3 +20,8 @@
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# ---------- 四、本地网页导出产物 ----------
+# export_presets.cfg 里 Web 预设的 export_path 指向这里，
+# 本地试导/编辑器里点导出都会生成这批文件，正式发布走 GitHub Actions。
+阿姨别追/build/
