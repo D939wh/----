@@ -31,12 +31,21 @@ func _ready() -> void:
 	await _wait(0.2)
 	r["起始"] = "血量 %d / 瘫痪 %s" % [s.血量, s.瘫痪]
 
-	# —— 挥击 1：应掉到 1 格 ——
+	# —— 挥击 1：应掉到 1 格，并被击退一大步 ——
 	await _tap_f()
 	r["一挥后"] = "血量 %d / 瘫痪 %s" % [s.血量, s.瘫痪]
+	await _wait(0.3)                 # 判定在 0.35s，_tap_f 只等到 0.55s：击退还在滑
+	r["击退"] = "学生被推开 %.0fpx（应 ≈70，朝右）/ 硬直已结束=%s" % [
+		s.global_position.x - 960.0, s._击退剩余 <= 0.0]
 
 	# —— 等 CD（1.2 秒）再挥：应 0 格 + 瘫痪 + 变色 ——
-	await _wait(1.3)
+	# 这一棍之前要把学生摆回来：上一棍的击退把她推出去 70px，
+	# 已经出了 67px 的棍长（手控的宿管不会自己追）。相当于「她追上去补一棍」。
+	# 直接搬人必须手动抹掉击退余速，否则下一帧冲量又把她推走。
+	await _wait(1.0)
+	s.velocity.x = 0.0
+	s._击退剩余 = 0.0
+	s.global_position = Vector2(960, 208)
 	await _tap_f()
 	await _wait(0.2)
 	r["二挥后"] = "血量 %d / 瘫痪 %s / 颜色(%d,%d,%d,%d)" % [
@@ -48,14 +57,20 @@ func _ready() -> void:
 
 	# —— 瘫痪的学生走不动（控制权在宿管手上，学生本来就不吃键盘；
 	#    这里推一把学生的速度，看她自己会不会恢复移动 —— 不该恢复）——
+	# 观察窗口要短于后摇（0.55 秒）：这一棍按下 F 后 0.55 秒才判完，后摇还在走。
 	var 学生原位 := s.global_position.x
 	Input.action_press("right")
-	await _wait(0.4)
+	await _wait(0.3)
 	Input.action_release("right")
-	r["瘫了走不动"] = "宿管位移 %.0f（后摇中应为 0）" % (k.global_position.x - 900.0)
+	r["瘫了走不动"] = "宿管位移 %.0f（收棍中，应 <5）/ 读数时还在挥=%s" % [
+		k.global_position.x - 900.0, k._挥击中()]
 
 	# —— 抓捕读条（策划案 §6 的 1.2 秒）：先试「按一下就松」→ 不该扛起来 ——
+	# 打瘫她的那一棍同样带击退：她已经滑到 1028 附近了。抓人前把人摆回脚边。
 	await _wait(1.0)
+	s.velocity.x = 0.0
+	s._击退剩余 = 0.0
+	s.global_position = Vector2(960, 208)
 	k.global_position = Vector2(940, 208)
 	await _wait(0.1)
 	Input.action_press("grab")
@@ -121,6 +136,44 @@ func _ready() -> void:
 	await _wait(0.1)
 	await _tap_f()
 	r["朝左挥"] = "宿管朝向 %.0f（应 -1）/ 学生血量 %d（应 1）" % [k._swing_dir, s.血量]
+	await _wait(0.3)
+	# 击退方向得跟「她在哪一边」走：站我左边挨打，就该被我往左推出去
+	r["击退方向"] = "学生 x 880 → %.0f（应更小，被推向左边）" % s.global_position.x
+
+	# —— 棍子本身：平时就得看得见，长度 = 攻击距离（判定框就是这根棍子）——
+	var 棍 = k._棍子
+	var 棍长 := -1.0
+	if 棍 != null and 棍.points.size() >= 2:
+		棍长 = 棍.points[0].distance_to(棍.points[1])
+	r["棍子"] = "有棍=%s / 可见=%s / 棍长 %.0f（应 %.0f）/ 粗细 %.0f（应 %.0f）" % [
+		棍 != null, 棍 != null and 棍.visible, 棍长, k.SWING_RANGE,
+		棍.width if 棍 != null else -1.0, k.棍宽]
+
+	# —— 前摇：按 F 后 0.2 秒还在抬手，学生不该掉血，棍子已经抬到头顶 ——
+	# 老实现在这一帧就掉血了；现在判定被推到 0.35 秒之后，这一条会替主人盯住「别又变回瞬发」。
+	await _wait(0.9)                 # 等上一棍的后摇走完
+	s.拉起()
+	k.global_position = Vector2(940, 208)
+	s.global_position = Vector2(1000, 208)
+	await _按方向("right")
+	Input.action_press("interaction")
+	await get_tree().physics_frame
+	Input.action_release("interaction")
+	await _wait(0.2)
+	var 棍尖y := -999.0
+	if k._棍子 != null and k._棍子.points.size() >= 2:
+		棍尖y = k._棍子.points[1].y
+	r["前摇中"] = "0.2 秒时学生血量 %d（应 2，还没判）/ 棍尖 y %.0f（待机约 -14，抬起应 < -60）" % [
+		s.血量, 棍尖y]
+
+	# —— 超出棍长：学生站 260px 外（远大于 67 的棍长），这一棍扫不到，血量不该变 ——
+	# 判定框就是那根棍子，不是「圈内必中」。
+	await _wait(1.3)                 # 这一棍走完 + 过 CD
+	s.global_position = Vector2(k.global_position.x - 260.0, 208)
+	await _wait(0.1)
+	var 打前血: int = s.血量
+	await _tap_f()
+	r["超出棍长"] = "血量 %d → %d（应不变）" % [打前血, s.血量]
 
 	# ── 互救：复制一个学生当队友，打瘫它，另一个按住 H 4 秒拉起来 ──
 	# 主场景只有一个学生，互救要两个人：复制一个当队友（策划案 §7.6）
@@ -202,6 +255,25 @@ func _ready() -> void:
 		_条可见(s), s._救人进度]
 	队友.拉起()
 
+	# —— AI 主动打人：把控制权交出去，阿姨看见人该自己走过去挥棍 ——
+	# 学生放在 200px（棍长边缘、刚出 `挥击距离`）：她得先追一小步，再站定抬手。
+	# 这一条同时验证「抢占」把 追击 → 攻击 的那一步接上了。
+	# 那个复制出来的队友要挪走：它还瘫在 730，比 1000 的学生近得多，
+	# 阿姨会一直去捶它（瘫了打不动），于是「学生血量没变」看起来像 AI 不会打人。
+	队友.global_position = Vector2(1600, 208)
+	Director.set_control(s)
+	s.拉起()
+	k.global_position = Vector2(800, 208)
+	s.global_position = Vector2(1000, 208)
+	await _wait(0.2)
+	var 打前血AI: int = s.血量
+	await _wait(2.5)
+	# 采样这一刻她可能在「攻击」也可能在「追击」：打中一棍会把学生击退 70px，
+	# 正好推出 60px 的挥击距离，她就得再追上去 —— 这正是要的节奏。
+	# 所以这一条只认「血量变少」，状态只作参考，不作判据。
+	r["AI主动打人"] = "学生血量 %d → %d（应变少）/ 阿姨状态「%s」（攻击或追击都正常）" % [
+		打前血AI, s.血量, k._机器.当前()]
+
 	# —— 恢复现场：控制权还给学生，血量拉起 ——
 	Director.set_control(s)
 	s.拉起()
@@ -230,13 +302,23 @@ func _条文字(谁: Node) -> String:
 	return 条.get_node("框/文字").text
 
 
-## 模拟「按一下 F」：press → 两个物理帧 → release → 稳定 0.15 秒
+## 模拟「按一下 F」，并等这一棍真的挥完（前摇 0.35 + 扫 0.14 + 一点余量）。
+## 挥击改成三段式后不能按下就读血量了：按下那一帧还在抬手，判定发生在 0.35 秒之后。
 func _tap_f() -> void:
 	Input.action_press("interaction")
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	Input.action_release("interaction")
-	await _wait(0.15)
+	await _wait(0.55)
+
+
+## 按一下方向键，把宿管的朝向定好（按住两个物理帧，位移小到可以忽略）
+func _按方向(键: String) -> void:
+	Input.action_press(键)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	Input.action_release(键)
+	await _wait(0.1)
 
 
 ## 模拟「按一下 G」：press → 两个物理帧 → release → 稳定 0.15 秒

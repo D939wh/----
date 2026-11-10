@@ -21,6 +21,8 @@ var 失败数 := 0
 
 ## 规则（颜色/编号）是全工程共用的，不在地图清单里
 const 规则 = preload("res://数据/通用规则.gd")
+## 学生的状态名常量：这里要核对「赢家进了已逃出」
+const 状态名 = preload("res://角色/学生/状态/状态名.gd")
 
 
 func _ready() -> void:
@@ -32,7 +34,8 @@ func _ready() -> void:
 	await get_tree().physics_frame
 
 	var s: CharacterBody2D = scene.get_node("student")
-	scene.get_node("student2").global_position = Vector2(1800, 178)  # 挪远，别混进感应区
+	var s2: CharacterBody2D = scene.get_node("student2")
+	s2.global_position = Vector2(1800, 178)  # 挪远，别混进感应区
 	# 全部拿编号向总管要，不翻代理的内部字典
 	var 锁口: Node = Director.thing("1-门厅")
 	var 东门: Node = Director.thing("1-走廊东")
@@ -52,6 +55,20 @@ func _ready() -> void:
 	_记("① 板子颜色来自通用规则", 一号.牌色 == 规则.钥匙板配色["一号"])
 
 	Director.set_control(s)
+
+	# ── ⑨a 反向验证：不插钥匙、只按 E 推开门 → 不算赢 ──
+	# 放在最前面做：等三块插满门就锁死了，再也推不回去。
+	# 这段只有在「出口错听 door_finished」时才会变红。
+	s.global_position = Vector2(810, 178)   # 门外侧，正好在出口判定区里
+	await _wait(0.45)
+	await _tap("open_door")
+	await _wait(0.5)
+	_记("⑨a 推开的门不算「解锁」", not Match.is_door_unlocked("1-走廊东"))
+	await _wait(1.2)
+	_记("⑨a 推开门站门外 1 秒也不算赢", Match.escaped.is_empty())
+	await _tap("open_door")                 # 关回去，后面照常插钥匙
+	await _wait(0.5)
+	_记("⑨a 门关回去了", 东门._amount <= 0.01)
 
 	# ── ② 扛起一号板：从 320 那边拿 ──
 	s.global_position = Vector2(320, 178)
@@ -137,20 +154,36 @@ func _ready() -> void:
 	_记("⑧ 门被解锁（整扇全开）", 东门._amount >= 0.99)
 	_记("⑧ 门现在不挡路", 东门._blocker.disabled)
 
-	# ── ⑨ 门开了，站门口 1 秒算逃出去 ──
+	# ── ⑨ 门被真正解锁后，自己走到门外侧站 1 秒才算逃出去 ──
 	var 出口: Node = Director.thing("1-门厅出口")
 	_记("⑨ 出口建出来了", 出口 != null)
 	if 出口 != null:
 		var 提示: Label = 出口.get_node("HUD/提示")
-		s.global_position = Vector2(950, 178)   # 先站到门外，确认不算
-		await _wait(0.4)
-		_记("⑨ 没站进门口不算逃出", not 提示.visible)
+		_记("⑨ 解锁记进了账本", Match.is_door_unlocked("1-走廊东"))
+		_记("⑨ 出口认到了自己等的门（已启用）", 出口._启用中)
 
-		s.global_position = Vector2(760, 178)   # 站进门口判定区
+		s.global_position = Vector2(950, 178)   # 判定区外
 		await _wait(0.4)
-		_记("⑨ 站进去但还没够 1 秒", not 提示.visible)
-		await _wait(0.9)
-		_记("⑨ 站够 1 秒：逃出去了", 提示.visible)
+		_记("⑨ 没站进判定区不算", Match.escaped.is_empty())
+
+		s.global_position = Vector2(750, 178)   # 判定区内、但在门内侧（< 760）
+		await _wait(1.2)
+		_记("⑨ 站在门内侧 1.2 秒不算（只在门外侧计时）", Match.escaped.is_empty())
+
+		s.global_position = Vector2(790, 178)   # 判定区内、门外侧
+		await _wait(1.2)
+		_记("⑨ 站到门外侧 1 秒：记一次赢", Match.escaped.size() == 1)
+		_记("⑨ 赢家进了「已逃出」", s._机器.当前() == 状态名.已逃出)
+		_记("⑨ 赢家横幅弹出来了", 提示.visible)
+		_记("⑨ 出口没停摆，还在等下一个人", 出口._启用中)
+
+		# 第二个人也能赢；同一个人不会被记第二次
+		# （前面的流程里宿管把 student2 打瘫了，先让它站起来再走过去）
+		s2.拉起()
+		s2.global_position = Vector2(790, 178)
+		await _wait(1.3)
+		_记("⑨ 第二个人也能赢", Match.escaped.size() == 2)
+		_记("⑨ 同一个人不会被记第二次", Match.escaped.count(s) == 1)
 
 	_收尾()
 

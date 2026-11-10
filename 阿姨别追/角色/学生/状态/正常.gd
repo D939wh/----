@@ -71,6 +71,12 @@ func 每帧(delta: float) -> void:
 	else:
 		h.velocity.x = move_toward(h.velocity.x, 0.0, h.FRICTION * delta)
 
+	# ── 脚下出声：Shift 慢走 = 1 档，常走 / 跑 = 2 档 ──────
+	# 认「真的在慢走」而不是「按着 Shift」：负重时禁慢走，
+	# 那时按着 Shift 也是 2 档的动静 —— 别让玩家按住 Shift 就凭空变安静。
+	var 慢走中: bool = sprint_held and h.is_on_floor() and h._可否慢走 and dir != 0.0
+	h.走出动静(delta, 慢走中)
+
 	h.move_and_slide()
 
 

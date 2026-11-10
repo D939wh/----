@@ -5,6 +5,9 @@ extends Node2D
 ## 谁按 E 谁就是 _user：门立刻按新使用者的速度反向走，进度不清零。
 ## 调手感：改 `数据/通用规则.gd` 顶部的「默认开门用时」，或给某扇门单独配。
 
+## 声音表：门是 4 档（「极大」）—— 全图最响的几件事之一。
+const 声音表 := preload("res://数据/声音表.gd")
+
 ## 这扇门的身份证（"1-走廊东" 这种）。由物件代理照清单盖章，或在检查器里手填。
 ## **全工程不许重号** —— 总管拿它当唯一键。
 ## 必须用英文名 thing_id 导出 —— 中文名导出属性在 `.tscn` 里赋值会静默失效。
@@ -28,6 +31,7 @@ var _amount: float = 0.0        # 0 = 全关，1 = 全开
 var _target: float = 0.0        # 正往哪去
 var _user: Node = null          # 现在是谁在推这扇门
 var _blocked: bool = true       # 当前碰撞体是不是挡着路
+var _已解锁: bool = false       # 被三块钥匙板弹开过 = 从此锁死，谁也关不上
 
 @onready var _panel: Polygon2D = $Panel
 @onready var _blocker: CollisionShape2D = $Blocker/CollisionShape2D
@@ -47,7 +51,10 @@ func _ready() -> void:
 
 
 ## 有人按了 E（求生者）或要开关门（宿管）。谁按，谁接管。
+## 已经解锁的门不再接受开关：策划案 §2.3 写的是「弹开并撑住」。
 func press(who: Node) -> void:
+	if _已解锁:
+		return
 	_user = who
 	_target = 0.0 if _target > 0.5 else 1.0
 	Director.door_pressed.emit(编号, who)
@@ -73,8 +80,11 @@ func 被解锁() -> void:
 	_user = null
 	_amount = 1.0
 	_target = 1.0
+	_已解锁 = true
 	_apply()                                   # 门板藏掉、碰撞体撤掉，人能过
 	Director.door_finished.emit(编号, true)
+	Match.register_unlock(编号)                # 账本只认这一条：真正的解锁
+	Events.发声(global_position, 声音表.档_极大, 声音表.来源_门)   # 弹开比推开更响，同样 4 档
 	print("[门] %s 被解锁，弹开了" % 编号)
 
 
@@ -86,6 +96,9 @@ func _process(delta: float) -> void:
 	if is_equal_approx(_amount, _target):
 		var is_open := _target > 0.5
 		Director.door_finished.emit(编号, is_open)
+		# 4 档：开关门是「非常大」的声音（主人定）—— 门一动，半层楼都知道。
+		# 发在「走完」这一刻：推的过程没有反馈，门板到位的声响最容易被听懂。
+		Events.发声(global_position, 声音表.档_极大, 声音表.来源_门)
 		print("[门] %s %s（%s 推的）" % [
 			编号,
 			"已打开" if is_open else "已关上",

@@ -18,6 +18,8 @@ config/icon="res://素材/角色参考/icon.svg"
 [autoload]
 
 Director="*res://单例/场景总管.gd"
+Match="*res://单例/对局数据.gd"
+Events="*res://单例/事件中枢.gd"
 _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 
 [display]
@@ -56,8 +58,8 @@ folder_colors={
 "res://界面/道具格/": "pink",
 "res://素材/": "red",
 "res://组件/": "green",
-"res://组件/状态机/": "green",
 "res://组件/抛投/": "green",
+"res://组件/状态机/": "green",
 "res://组件/蓄力/": "green",
 "res://角色/": "orange",
 "res://角色/学生/": "yellow",

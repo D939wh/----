@@ -76,13 +76,13 @@ func 每帧(delta: float) -> void:
 		h.velocity.y *= h.JUMP_CUT
 
 	# ── 左右速度 ──
-	# 三个因素影响移速：后摇站定（挥完不能动）、扛人减速、按住抓人时站定
+	# 三个因素影响移速：挥棍站定（前摇/扫/后摇全程不能动）、扛人减速、按住抓人时站定
 	var 走速: float = h.SPEED
 	if h._carried_student != null:
 		走速 = h.SPEED * h.CARRY_SPEED_MULT
 	if h._抓捕目标 != null:
 		dir = 0.0
-	if dir != 0.0 and h._swing_recover_left <= 0.0:
+	if dir != 0.0 and not h._挥击中():
 		var same_dir := signf(h.velocity.x) == signf(dir)
 		if not (not h.is_on_floor() and same_dir and absf(h.velocity.x) > 走速):
 			h.velocity.x = move_toward(h.velocity.x, dir * 走速, h.ACCEL * delta)

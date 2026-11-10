@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="TileSet" uid="uid://dnc13muij7c4l" path="res://素材/场景/t.tres" id="1_tileset"]
 [ext_resource type="PackedScene" uid="uid://bu704p01xw1bj" path="res://交互物/梯子/梯子.tscn" id="2_ladder"]
@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" path="res://角色/宿管/宿管.tscn" id="8_keeper"]
 [ext_resource type="PackedScene" path="res://界面/调试面板/调试面板.tscn" id="9_dbg"]
 [ext_resource type="Script" path="res://场景/物件代理/物件代理.gd" id="7_agent"]
+[ext_resource type="PackedScene" path="res://界面/声音圈/声音圈.tscn" id="10_ring"]
 
 [node name="主场景2" type="Node2D"]
 
@@ -45,6 +46,8 @@ thing_id = "1-道具"
 [node name="HUD" parent="." instance=ExtResource("6_hud")]
 
 [node name="DebugPanel" parent="." instance=ExtResource("9_dbg")]
+
+[node name="声音圈" parent="." instance=ExtResource("10_ring")]
 
 [node name="ObjectAgent" type="Node2D" parent="."]
 script = ExtResource("7_agent")

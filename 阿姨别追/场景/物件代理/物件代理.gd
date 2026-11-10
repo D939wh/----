@@ -91,7 +91,8 @@ func _配置(物: Node2D, 类型: String, 编号: String, 条目: Dictionary) ->
 			物.setup(
 				位置,
 				str(条目.get("等的门", "")),
-				float(条目.get("站多久", 1.0))
+				float(条目.get("站多久", 1.0)),
+				float(条目.get("出门方向", 1.0))
 			)
 		"检修口":
 			物.setup(位置.x, 位置.y, float(条目.get("宽", 32.0)))
