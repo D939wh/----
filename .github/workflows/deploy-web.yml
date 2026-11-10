@@ -47,6 +47,7 @@ jobs:
 
       - name: 导出网页包（与本地同一预设「Web」）
         run: |
+          mkdir -p 阿姨别追/build/web
           "./Godot_v${GODOT_VERSION}-stable_linux.x86_64" \
             --headless --path 阿姨别追 \
             --export-release "Web" 阿姨别追/build/web/index.html
