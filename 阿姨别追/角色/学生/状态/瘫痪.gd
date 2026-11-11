@@ -1,23 +1,42 @@
 extends "res://组件/状态机/状态.gd"
-## 瘫痪 —— 两格血打空，蹲在地上。不吃输入、不能交互，但能按 H 自己爬起来。
+## 瘫痪 —— 两格血打空，趴在地上。不能跳、不能爬、不能交互，但能**蹭着慢慢挪**，
+## 也能按住 H 自己爬起来。
+##
+## 【2026-11-11 主人定】瘫了不是钉死在地上：相当于背上压着一件**隐形 4 档搬运物** ——
+## 速度、跳跃、攀爬的限制照 `数据/重量档位.gd` 的第 4 档执行（30% 速度、不能跳、不能爬）。
+## 这里只用到「移速倍率」那一条，因为瘫着本来就没有跳和爬的代码 —— 想让爬得更快/更慢，
+## 改档位表里 4 档的 `移速倍率`，别在这里另写一个数。
 ##
 ## `瘫痪` 由 `血量 <= 0` 派生，不单独存储。
-## 被拎走时本状态仍成立，放下后自动回到这里。
+## 被搬运走时本状态仍成立，放下后自动回到这里。
 
 const 状态名 := preload("res://角色/学生/状态/状态名.gd")
+## 重量档位表：「背上那个隐形重物」的唯一数据来源
+const 重量档位 := preload("res://数据/重量档位.gd")
+const 爬行档名 := "4"
 
 
 func 每帧(delta: float) -> void:
 	var h = host
-	# 瘫了：不吃输入、不能交互，但重力照常 —— 被放下/被搬到空中会自己落到地上
-	h.velocity.x = 0.0
+	# 键盘归不归我（没被操控时不能因为别人按方向键就自己爬）
+	var 受控: bool = h.受控()
+
+	# ── 爬行：4 档速度（隐形重物唯一露在外面的表现）───────
+	var dir: float = Input.get_axis("left", "right") if 受控 else 0.0
+	if dir != 0.0:
+		var 目标速度: float = h.SPEED * float(重量档位.表[爬行档名]["移速倍率"])
+		h.velocity.x = move_toward(h.velocity.x, dir * 目标速度, h.ACCEL * delta)
+	else:
+		h.velocity.x = move_toward(h.velocity.x, 0.0, h.FRICTION * delta)
+
+	# 重力照常 —— 被放下 / 被搬到空中会自己落到地上
 	if not h.is_on_floor():
 		h.velocity.y += h.GRAVITY * delta
 	else:
 		h.velocity.y = 0.0
 
 	# 只有当前被玩家操作时才响应 H 自救，避免一次按键让所有瘫痪角色同时起身。
-	if Director.当前控制 == null or Director.当前控制 == h:
+	if 受控:
 		_推进自救(h, delta)
 
 	h.move_and_slide()

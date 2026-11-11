@@ -8,6 +8,7 @@ extends Node2D
 ##   ④ 被宿管扛着 → 挣不开（只认队友；宿管扛走只能等她放下）
 ##   ⑤ 搬运 CD：跳脱那一瞬间就套上，0.3 秒（空中也照常计时），期间抓不回去
 ##   ⑥ 箱子（钥匙板同一套）刚脱手也不能立刻捡
+##   ⑦ 瘫痪不是钉死：能按 4 档速度蹭着爬，但跳不起来
 ##
 ## 注意：每一项开头都 `_摆位()`，里面会把搬运保护清零。不清的话，上一项放下时留下的
 ## 保护会把下一项的搬人动作挡掉，测出来的全是「扛不起来」这种假结果。
@@ -41,6 +42,7 @@ func _ready() -> void:
 	await _测4_宿管扛着挣不开()
 	await _测5_跳脱保护挡住立刻再抓()
 	await _测6_箱子也受保护()
+	await _测7_瘫着能爬()
 
 	_打印()
 	get_tree().quit()
@@ -204,3 +206,27 @@ func _打印() -> void:
 	for 项 in 结果:
 		print("%s：%s" % [项, 结果[项]])
 	print("──────── 完 ────────")
+
+
+## ⑦ 瘫痪 = 背着隐形 4 档重物：能慢慢挪（30% 速度），但跳不起来
+func _测7_瘫着能爬() -> void:
+	await _摆位()
+	学生2.血量 = 1
+	学生2.被打中()                    # 两格打空 → 瘫
+	await _等(0.6)                     # 等击退滑停
+	Director.set_control(学生2)
+	var 起点x: float = 学生2.global_position.x
+	var 起跳前y: float = 学生2.global_position.y
+	Input.action_press("right")
+	await _等(0.6)
+	Input.action_release("right")
+	var 位移: float = 学生2.global_position.x - 起点x
+	await _等(0.1)
+	await _点跳()                      # 4 档不能跳
+	await _等(0.2)
+	var 离地: float = 起跳前y - 学生2.global_position.y
+
+	结果["⑦ 瘫着爬"] = "瘫痪=%s｜0.6 秒挪 %.0f 像素（4 档 30%% 速度应 ≈50）｜跳起 %.0f 像素（应 0）" % [
+		学生2.瘫痪, 位移, 离地]
+	学生2.拉起()
+	await _等(0.3)
