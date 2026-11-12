@@ -10,12 +10,20 @@ extends "res://组件/状态机/状态.gd"
 
 const 状态名 := preload("res://角色/宿管/状态/状态名.gd")
 
+## 站定的时候**左右看**：每 `张望间隔` 秒转一次身（2026-11-13 加）。
+## 不加这个，她就是一架固定炮台 —— 朝向那一侧永远看得见、背后永远安全，
+## 「趁她转头赶紧挪」这个动作就不存在了。
+const 张望间隔: float = 1.4
+
 ## 这次已经站了多久（秒）。进状态时清零。
 var _站了: float = 0.0
+## 距离下一次转头还有多久（秒）。
+var _张望计时: float = 0.0
 
 
 func 进入(_上个: String = "") -> void:
 	_站了 = 0.0
+	_张望计时 = 0.0
 
 
 func 每帧(delta: float) -> void:
@@ -26,6 +34,12 @@ func 每帧(delta: float) -> void:
 	if not h.is_on_floor():
 		h.velocity.y += h.GRAVITY * delta
 	h.move_and_slide()
+
+	# 左右看：转身扫一眼背后
+	_张望计时 += delta
+	if _张望计时 >= 张望间隔:
+		_张望计时 = 0.0
+		h._面朝(-h._swing_dir if h._swing_dir != 0.0 else 1.0)
 
 	# 看见人 → 立刻交给决策（`decide()` 会给出追击）
 	if h._看得见的目标() != null:

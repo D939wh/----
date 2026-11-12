@@ -5,6 +5,19 @@ extends Area2D
 ## 认出方式：`collision_layer` = 第 4 层「梯子」，学生 `ClimbZone` 掩码从 `数据/通用规则.gd` 取。
 ## 不给编号：不是按键交互物，学生用感应区自己撞上来。
 
+## 手摆在场景里时用的尺寸（2026-11-12 加，和门的 width/height 一个套路）。
+## 走物件代理的（清单建的）会被 `setup()` 覆盖，两者不冲突。
+## 名字必须英文：中文名导出属性在 `.tscn` 里赋值会静默失效。
+## 位置仍然是**中心**（不是底边），所以「从地面 352 爬到平台 208」= 高 144、中心 y 280。
+@export var ladder_height: float = 300.0
+@export var ladder_width: float = 32.0
+@export var show_texture: bool = false
+
+
+func _ready() -> void:
+	# 手摆的梯子：按自己的导出值把判定框重算一遍，别用 .tscn 里那份默认 300 高的。
+	setup(position, ladder_height, ladder_width, show_texture)
+
 ## 按「中心点 + 高 + 宽」摆一块判定框。
 ##
 ## 【位置是中心，不是底边】物件清单里的坐标一律是这件东西的**中心**，

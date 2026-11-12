@@ -34,7 +34,12 @@ func 触发(名字: String, 谁: Node = null) -> bool:
 	var 动作 := str(条.get("动作", ""))
 	match 动作:
 		"召唤":
-			Summon.生成(_场景(条), 谁, _摆位(条))
+			var 生 := Summon.生成(_场景(条), 谁, _摆位(条))
+			# 表里写了 `"惊动": true` 的话，顺便告诉它「人在那儿」。
+			# 走的是鸭子类型（只认方法名 `被惊动`），所以剧情表不认识任何具体角色 ——
+			# 召唤一个箱子（没有这个方法）就自动什么都不发生。
+			if 生 != null and bool(条.get("惊动", false)) and 生.has_method("被惊动"):
+				生.被惊动(谁.global_position)
 		_:
 			push_error("[剧情] 「%s」的动作是「%s」，不认识（认识的：召唤）" % [名字, 动作])
 			return false

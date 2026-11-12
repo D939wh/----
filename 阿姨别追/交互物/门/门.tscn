@@ -1,32 +1,34 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://d2dj5pgblphtr"]
 
 [ext_resource type="Script" uid="uid://ckok3fbdble77" path="res://交互物/门/门.gd" id="1_door"]
 
 [sub_resource type="RectangleShape2D" id="Rect_blocker"]
-size = Vector2(64, 96)
+size = Vector2(30, 83)
 
 [sub_resource type="RectangleShape2D" id="Rect_zone"]
-size = Vector2(88, 128)
+size = Vector2(54, 107)
 
-[node name="Door" type="Node2D"]
+[node name="Door" type="Node2D" unique_id=2115662641]
 script = ExtResource("1_door")
 
-[node name="Panel" type="Polygon2D" parent="."]
+[node name="Panel" type="Polygon2D" parent="." unique_id=1387171051]
 color = Color(0.42, 0.31, 0.22, 1)
-polygon = PackedVector2Array(-32, -96, 32, -96, 32, 0, -32, 0)
+polygon = PackedVector2Array(-15, -83, 15, -83, 15, 0, -15, 0)
 
-[node name="Blocker" type="StaticBody2D" parent="."]
-collision_layer = 1
+[node name="Art" type="Sprite2D" parent="." unique_id=812345678]
+visible = false
+
+[node name="Blocker" type="StaticBody2D" parent="." unique_id=348013032]
 collision_mask = 0
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Blocker"]
-position = Vector2(0, -48)
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Blocker" unique_id=136085645]
+position = Vector2(1, -41.5)
 shape = SubResource("Rect_blocker")
 
-[node name="Zone" type="Area2D" parent="." groups=["door"]]
+[node name="Zone" type="Area2D" parent="." unique_id=34927032 groups=["door"]]
 collision_layer = 16
 collision_mask = 0
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Zone"]
-position = Vector2(0, -60)
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Zone" unique_id=547025871]
+position = Vector2(1, -41.5)
 shape = SubResource("Rect_zone")

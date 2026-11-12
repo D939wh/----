@@ -14,7 +14,17 @@ const 暗色 := Color(0.10, 0.10, 0.12, 1.0)
 ##   true  = 一号只认一号孔（策划案 v0.5 的规则）
 ##   false = 随便哪个空孔都能插，凑满三个就行（策划案说的「这条可关」）
 ## 改这一个开关就退化，代码不用动。
-@export var 要求配对: bool = true
+## 钥匙必须和孔对色（一号钥匙插一号孔）。关掉 = 任意钥匙插任意空孔。
+## **英文名导出**：这个字段以前叫 `要求配对`（中文名），在 `.tscn` 里赋值会静默失效 ——
+##   想在一张图上关掉配对，改代码默认值是唯一办法。2026-11-12 改成英文名，别名保留。
+@export var same_color_required: bool = true
+
+## 中文别名：代码里统一用「要求配对」
+var 要求配对: bool:
+	get:
+		return same_color_required
+	set(值):
+		same_color_required = 值
 
 ## 这个锁口的身份证（"1-门厅" 这种）。由物件代理照清单盖章，或在检查器里手填
 ## 必须用英文名 thing_id 导出 —— 中文名导出属性在 `.tscn` 里赋值会静默失效。
@@ -31,7 +41,33 @@ var 编号: String:
 @export var 互动优先级: int = 0
 
 var _插孔用时: float = 2.0      # 由代理照这张图的清单填。0.1 基本等于按一下就进
-var _连哪扇门: String = ""      # 插满时开哪扇门（名字，不是节点）
+
+## 这组锁板上有几个孔（默认 3 = 一号 / 二号 / 三号各一个）。
+## **填 1 = 只要一把钥匙就开**：多出来的孔节点会被藏起来，插一块就判满。
+## 用的是前 N 个孔，所以填 1 时那个孔是「一号」的孔、插一号钥匙板。
+@export var hole_count: int = 3:
+	set(值):
+		hole_count = clampi(值, 1, 3)
+		if is_node_ready():
+			_按孔数摆孔()
+
+## 插满时开哪扇门（**编号**，不是节点）。手摆的锁口在检查器里填，
+## 清单建的由 setup() 写进来。英文名导出：中文名在 `.tscn` 里赋值会静默失效。
+@export var linked_door: String = ""
+
+## 中文别名：代码里统一用「连哪扇门」
+var 连哪扇门: String:
+	get:
+		return linked_door
+	set(值):
+		linked_door = 值
+
+## 中文别名：孔数
+var 孔数: int:
+	get:
+		return hole_count
+	set(值):
+		hole_count = 值
 
 ## 编号 -> { "亮": bool, "色": Color, "节点": Polygon2D }
 var _孔: Dictionary = {}
@@ -46,29 +82,40 @@ var _读条: CanvasLayer = null
 
 
 func _ready() -> void:
-	# 报到：总管拿编号就能找到这个锁口（三孔插满时要按编号找门，也是靠这本账）
+	# 报到：总管拿编号就能找到这个锁口（孔插满时要按编号找门，也是靠这本账）
 	Director.register_thing(编号, self)
-	# 场景里固定摆着三个孔节点（孔1/孔2/孔3），这里把它们和编号对起来。
-	# 颜色从 `通用规则.gd` 取 —— 和钥匙板铁牌是同一份，不会出现「钥匙黄、孔红」。
+	_按孔数摆孔()
+
+
+## 按 `hole_count` 点亮前 N 个孔，多余的直接藏起来。
+## 场景里固定摆着三个孔节点（孔1/孔2/孔3）—— 用几个由 `hole_count` 说了算，
+## 所以「一把钥匙就开」不用去删节点，填个 1 就行。
+func _按孔数摆孔() -> void:
+	_孔.clear()
 	var i := 0
 	for 号 in 规则.钥匙板编号:
 		var 节点 := get_node_or_null("孔%d" % (i + 1)) as Polygon2D
+		var 用这个: bool = i < hole_count
 		if 节点 != null:
-			节点.color = 暗色
-			_孔[号] = {
-				"亮": false,
-				"色": 规则.钥匙板配色.get(号, Color.WHITE),
-				"节点": 节点,
-			}
+			节点.visible = 用这个
+			if 用这个:
+				节点.color = 暗色
+				_孔[号] = {
+					"亮": false,
+					"色": 规则.钥匙板配色.get(号, Color.WHITE),
+					"节点": 节点,
+				}
 		i += 1
 
 
-## 由物件代理按清单调用：站哪、插一块要几秒、插满开哪扇门
+## 由物件代理按清单调用：站哪、插一块要几秒、插满开哪扇门、几个孔
 ## （编号由代理在 add_child 之前盖好，见 物件代理.gd）
-func setup(pos: Vector2, 用时: float, 门: String) -> void:
+func setup(pos: Vector2, 用时: float, 门: String, 新孔数: int = 3) -> void:
 	position = pos
 	_插孔用时 = maxf(用时, 0.01)
-	_连哪扇门 = 门
+	linked_door = 门
+	if 新孔数 != 3:
+		hole_count = 新孔数      # setter 里会重摆孔
 
 
 ## 按键进来：只认「插钥匙」，其余不归我管
@@ -192,9 +239,9 @@ func _完成() -> void:
 
 
 func _全插满() -> void:
-	print("[锁口] %s 三个孔都插满了，开「%s」" % [编号, _连哪扇门])
+	print("[锁口] %s 的 %d 个孔都插满了，开「%s」" % [编号, _孔.size(), linked_door])
 	# 按编号递给总管，由总管找到那扇门去开；门不在时 report 会报红，不静默失败
-	Director.report(_连哪扇门, "unlock", { "锁口": 编号 })
+	Director.report(linked_door, "unlock", { "锁口": 编号 })
 
 
 func _中断(原因: String) -> void:

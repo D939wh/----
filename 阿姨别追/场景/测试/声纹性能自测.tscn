@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://场景/测试/声纹性能自测.gd" id="1_wavebench"]
+
+[node name="声纹性能自测" type="Node"]
+script = ExtResource("1_wavebench")

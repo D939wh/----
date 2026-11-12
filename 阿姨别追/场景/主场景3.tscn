@@ -15,7 +15,7 @@ script = ExtResource("2_agent")
 list_path = "res://数据/测试/物件清单_主场景3.gd"
 
 [node name="student" parent="." unique_id=1961284912 instance=ExtResource("3_student")]
-position = Vector2(500, 280)
+position = Vector2(502, 280)
 
 [node name="student2" parent="." unique_id=1961284913 instance=ExtResource("3_student")]
 position = Vector2(400, 280)

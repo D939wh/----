@@ -30,13 +30,13 @@ const 已逃出状态 := preload("res://角色/学生/状态/已逃出.gd")
 var _机器
 
 # ── 手感 ─────────────────────────────────────────────────────
-const SPEED: float = 315.0     #速度（常走）
+const SPEED: float = 260.0     #速度（常走）
 const ACCEL: float = 1400.0
 const FRICTION: float = 1800.0
 
 # 按住 Shift：减速档（按住=慢走，松手=快走）
-const SLOW_SPEED: float = 200.0  # 慢走目标速度。嫌不够慢 → 调小
-const SLOW_DECEL: float = 200.0  # 减速快慢。嫌切太突兀 → 调小
+const SLOW_SPEED: float = 150.0  # 慢走目标速度。嫌不够慢 → 调小
+const SLOW_DECEL: float = 100.0  # 减速快慢。嫌切太突兀 → 调小
 const SPRINT_TIME: float = 0.16   # 冲刺时长（废弃，暂留）
 const SPRINT_CD: float = 1.5     # 冲刺冷却（废弃，暂留）
 const SPRINT_SPEED: float = 288.0  # 冲刺速度（废弃，暂留）
@@ -882,6 +882,9 @@ func _飞(delta: float) -> void:
 	if _抛投.推进(self, delta):
 		velocity = Vector2.ZERO
 		_set_collision_disabled(false)
+		# 【2026-11-13】人砸在地上也一样要响，且响在**落点**（同箱子）——
+		# 扔队友当诱饵这条战术，声纹上得看得出「人落在哪」。
+		Events.发声(global_position, 声音表.档_很大, 声音表.来源_丢物)
 		print("[学生] 落地了")
 
 

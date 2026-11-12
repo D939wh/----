@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://场景/测试/声纹预览.gd" id="1_wavepreview"]
+
+[node name="声纹预览" type="Node"]
+script = ExtResource("1_wavepreview")

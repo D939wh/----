@@ -29,6 +29,9 @@ func 每帧(delta: float) -> void:
 		h.move_and_slide()
 		return
 
-	# 撞墙 / 到崖边就不再往前挤（`_朝目标走` 返回 false）。不切状态 ——
+	# 撞墙 / 落差太深就不再往前挤（`_朝目标走` 返回 false）。不切状态 ——
 	# 目标可能就在墙那边，站住等它绕过来，比掉头乱跑更像个追人的。
-	h._朝目标走(目标.global_position.x, h.追击速度, delta)
+	# 「人在下面」这句要传下去：她要追的人跳下楼层了，她得跟着跳，
+	# 不然就会站在崖边看着人跑掉（2026-11-12 加）。
+	var 下方: bool = 目标.global_position.y > h.global_position.y + 24.0
+	h._朝目标走(目标.global_position.x, h.追击速度, delta, 下方)

@@ -28,8 +28,15 @@ var 编号: String:
 	set(值):
 		thing_id = 值
 
+## 盖板宽度（像素）。手摆在场景里时用这个值；走物件代理的会被 `setup()` 覆盖。
+## 名字必须英文：中文名导出属性在 `.tscn` 里赋值会静默失效。
+@export var width: float = 32.0
+
 
 func _ready() -> void:
+	# 手摆的检修口：按导出宽度重算盖板（.tscn 里那份形状是所有实例共用的，不能直接改）
+	_改宽度(width)
+	半宽 = width * 0.5
 	Director.register_thing(编号, self)
 
 

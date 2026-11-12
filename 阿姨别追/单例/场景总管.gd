@@ -28,14 +28,24 @@ func register_thing(编号: String, 节点: Node) -> void:
 			节点.name, 节点.get_script().resource_path if 节点.get_script() else "?"])
 		return
 	if _things.has(编号) and _things[编号] != 节点:
-		push_warning("[总管] 编号重了：%s —— 后来的 %s 顶掉前面的 %s" % [
-			编号, 节点.name, _things[编号].name])
+		# 旧的那件**可能已经被释放了**（箱子被搬走、门被拆、自测换场）。
+		# 直接读 `.name` 会报 `previously freed` —— 2026-11-12 自测里踩到。
+		var 旧的 = _things[编号]
+		if is_instance_valid(旧的):
+			push_warning("[总管] 编号重了：%s —— 后来的 %s 顶掉前面的 %s" % [
+				编号, 节点.name, 旧的.name])
 	_things[编号] = 节点
 
 
 ## 按编号拿节点。没有就返回 null
 func thing(编号: String) -> Node:
-	return _things.get(编号.strip_edges(), null)
+	var 键 := 编号.strip_edges()
+	var 物 = _things.get(键, null)
+	# 账上还挂着、东西已经没了：顺手销账，别让自己下次又读到个空壳
+	if 物 != null and not is_instance_valid(物):
+		_things.erase(键)
+		return null
+	return 物
 
 
 ## 现在登记了多少件东西（调试/自测用）
@@ -129,6 +139,7 @@ var _controllables: Array[Node] = []
 
 ## 角色出生时自己来报到（在 _ready 里喊一句就行）
 func register_controllable(who: Node) -> void:
+	_剔除失效()      # 先清一遍：上一场被删掉的角色还留在名单里，下面重设镜头会去碰它
 	if who in _controllables:
 		return
 	_controllables.append(who)
@@ -186,6 +197,8 @@ func _剔除失效() -> void:
 ## 把镜头交给它。每个角色自带一个相机，同一时刻只开一个
 func _相机交给(who: Node) -> void:
 	for one in _controllables:
+		if not is_instance_valid(one):
+			continue          # 名单里可能还留着已经删掉的角色：跳过，别在死节点上调方法
 		var 镜头 := one.get_node_or_null("Camera2D")
 		if 镜头 != null:
 			镜头.enabled = (one == who)

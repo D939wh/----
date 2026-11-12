@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="阿姨别追"
-run/main_scene="uid://d3t1fh2c14h3k"
+run/main_scene="uid://co6qyk3pdubsi"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://素材/角色参考/icon.svg"
 
