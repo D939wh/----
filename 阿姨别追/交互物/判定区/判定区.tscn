@@ -1,0 +1,26 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://交互物/判定区/判定区.gd" id="1_script"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
+resource_local_to_scene = true
+size = Vector2(48, 56)
+
+[node name="判定区" type="Area2D"]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_script")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_1")
+
+[node name="框" type="Node2D" parent="."]
+
+[node name="面" type="Polygon2D" parent="框"]
+color = Color(1, 0.2, 0.6, 0.22)
+polygon = PackedVector2Array(-24, -28, 24, -28, 24, 28, -24, 28)
+
+[node name="线" type="Line2D" parent="框"]
+points = PackedVector2Array(-24, -28, 24, -28, 24, 28, -24, 28, -24, -28)
+width = 1.0
+default_color = Color(1, 0.35, 0.75, 0.9)

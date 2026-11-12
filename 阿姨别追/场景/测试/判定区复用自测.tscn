@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://场景/测试/判定区复用自测.gd" id="1_selftest"]
+
+[node name="判定区复用自测" type="Node2D"]
+script = ExtResource("1_selftest")

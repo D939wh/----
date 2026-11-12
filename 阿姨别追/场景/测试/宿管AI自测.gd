@@ -24,7 +24,17 @@ func _ready() -> void:
 
 	s = scene.get_node("student")
 	s2 = scene.get_node("student2")
-	k = scene.get_node("宿管")
+	# 主场景3 从 11-12 17:20 起**不再预摆宿管**（阿姨改成剧情触发时才召唤）。
+	# 本测专测她的 AI，那就自己造一只，位置沿用原来那只 (900, 320)。
+	var 宿管场景: PackedScene = load("res://角色/宿管/宿管.tscn")
+	k = 宿管场景.instantiate()
+	scene.add_child(k)
+
+	# 主场景3 里 11-12 新加了一块「剧情判定区」（踩中就召唤一只阿姨）。
+	# 本测只管宿管 AI，多出来一只阿姨会把「场上就她一个」的读数搅乱 —— 直接标成已触发，等于关掉。
+	var 判定区 := Director.thing("剧情-一楼走廊")
+	if 判定区 != null:
+		判定区.已触发 = true
 
 	# ── A. 有人按键时：她必须交给手控，姿态与原来一致 ──
 	Director.set_control(k)

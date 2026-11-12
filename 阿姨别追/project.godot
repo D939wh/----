@@ -20,6 +20,8 @@ config/icon="res://素材/角色参考/icon.svg"
 Director="*res://单例/场景总管.gd"
 Match="*res://单例/对局数据.gd"
 Events="*res://单例/事件中枢.gd"
+Summon="*res://单例/召唤.gd"
+Story="*res://单例/剧情.gd"
 _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 
 [display]

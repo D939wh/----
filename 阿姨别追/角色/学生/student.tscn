@@ -2,15 +2,70 @@
 
 [ext_resource type="Script" uid="uid://jsrsy436jrhg" path="res://角色/学生/student.gd" id="1_77438"]
 [ext_resource type="Texture2D" uid="uid://bskir84bihvkp" path="res://素材/角色参考/355d4aca7d49ebbdcdae245fd3338a31.png" id="2_ncbn4"]
+[ext_resource type="Texture2D" uid="uid://7p18hww5a7qg" path="res://素材/角色参考/1.png" id="3_k57qt"]
+[ext_resource type="Texture2D" uid="uid://be7fvwsakwa" path="res://素材/角色参考/2.png" id="4_qlx4k"]
+[ext_resource type="Texture2D" uid="uid://be6lq0yd0kct4" path="res://素材/角色参考/3.png" id="5_j1er0"]
+[ext_resource type="Texture2D" uid="uid://bfpjjkkf5i66q" path="res://素材/角色参考/4.png" id="6_qfjkx"]
+[ext_resource type="Texture2D" uid="uid://dvux007f2bblg" path="res://素材/角色参考/5.png" id="7_4j0k3"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_37git"]
 animations = [{
+"frames": [],
+"loop": 1,
+"name": &"受击",
+"speed": 5.0
+}, {
+"frames": [],
+"loop": 1,
+"name": &"帮助",
+"speed": 5.0
+}, {
 "frames": [{
 "duration": 1.0,
 "texture": ExtResource("2_ncbn4")
 }],
 "loop": 1,
-"name": &"default",
+"name": &"待机",
+"speed": 5.0
+}, {
+"frames": [],
+"loop": 1,
+"name": &"投掷",
+"speed": 5.0
+}, {
+"frames": [],
+"loop": 1,
+"name": &"瘫痪",
+"speed": 5.0
+}, {
+"frames": [],
+"loop": 1,
+"name": &"自救",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 0.5,
+"texture": ExtResource("3_k57qt")
+}, {
+"duration": 0.5,
+"texture": ExtResource("4_qlx4k")
+}, {
+"duration": 0.5,
+"texture": ExtResource("5_j1er0")
+}, {
+"duration": 0.5,
+"texture": ExtResource("7_4j0k3")
+}, {
+"duration": 0.5,
+"texture": ExtResource("6_qfjkx")
+}],
+"loop": 1,
+"name": &"跑",
+"speed": 5.0
+}, {
+"frames": [],
+"loop": 1,
+"name": &"跳",
 "speed": 5.0
 }]
 
@@ -26,10 +81,14 @@ size = Vector2(96, 96)
 [node name="student" type="CharacterBody2D" unique_id=1178503731]
 collision_mask = 3
 script = ExtResource("1_77438")
+metadata/_edit_horizontal_guides_ = [-42.0, 0.0, -42.0]
+metadata/_edit_vertical_guides_ = [-11.0, 11.0]
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=2035504585]
 position = Vector2(0, -21)
 sprite_frames = SubResource("SpriteFrames_37git")
+animation = &"跑"
+frame_progress = 0.8925978
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=161101283]
 position = Vector2(0, -32)
